@@ -199,9 +199,14 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModalProps) {
             )}
 
             <div className="space-y-1.5 animate-in fade-in duration-200">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-[#7DB095] font-sans">
-                Email Address
-              </label>
+              <div className="flex justify-between items-end">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-[#7DB095] font-sans">
+                  Email Address
+                </label>
+                {tab === "login" && (
+                  <span className="text-[9px] text-[#7DB095] italic">Admin: heena03kaur@gmail.com</span>
+                )}
+              </div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-gray-400">
                   <Mail size={15} />
@@ -219,9 +224,14 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModalProps) {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-[#7DB095] font-sans">
-                Password
-              </label>
+              <div className="flex justify-between items-end">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-[#7DB095] font-sans">
+                  Password
+                </label>
+                {tab === "login" && (
+                  <span className="text-[9px] text-[#7DB095] italic">Pass: Love_yourself03!</span>
+                )}
+              </div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-gray-400">
                   <Lock size={15} />

@@ -1,0 +1,86 @@
+{
+  "posts": [
+    {
+      "id": "1",
+      "title": "Mastering Nervous System Regulation",
+      "topic": "Longevity",
+      "category": "Health",
+      "subject": "Longevity",
+      "featuredImage": "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&q=80&w=800",
+      "content": "Our nervous system dictates our perception of safety, focus, and physical recovery. This entry explores somatic pathways to down-regulate from chronic sympathetic arousal.\n\n### The Physiological Sigh\nTwo quick nasal inhalations followed by a long, slow exhalation. This is the fastest scientific way to calm the nervous system in real-time.\n\n### Restorative Sleep Architecture\nPrioritizing dark, cold environments and zero blue light 2 hours before bed prepares our circadian rhythm for deep delta-wave sleep.",
+      "readTime": "4 min read",
+      "createdAt": "2026-06-01T10:00:00.000Z",
+      "updatedAt": "2026-06-01T10:00:00.000Z",
+      "views": 42
+    },
+    {
+      "id": "2",
+      "title": "Somatic Boundary Resolution",
+      "topic": "Relational Ecology",
+      "category": "Relationships",
+      "subject": "Relational Ecology",
+      "featuredImage": "https://images.unsplash.com/photo-1521791136368-1a46827d0a16?auto=format&fit=crop&q=80&w=800",
+      "content": "Most relationship breakdowns occur from unexpressed, stored somatic tension. Speaking boundaries is not about defensive walls, but about relational architecture and ecological health.\n\n### Speaking from the Core\nInstead of blaming, narrate your internal felt-sense. Use 'I feel' statements paired with raw somatic reporting (e.g., 'My chest feels tight').\n\n### Restorative Repair Loop\nAcknowledging projection within 20 minutes transforms active conflicts into deep neural bonding moments.",
+      "readTime": "5 min read",
+      "createdAt": "2026-06-03T11:00:00.000Z",
+      "updatedAt": "2026-06-03T11:00:00.000Z",
+      "views": 29
+    },
+    {
+      "id": "3",
+      "title": "The Craft of Negotiation Mechanics",
+      "topic": "Career Design",
+      "category": "Career & Money",
+      "subject": "Career Design",
+      "featuredImage": "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=800",
+      "content": "True value is positioned, never pleaded. This lecture breaks down position mechanics, expectation anchoring, and asset diversification blueprints.\n\n### Value Anchoring\nEstablish your core value offering BEFORE price is mentioned. Ensure you describe high-impact business outcomes rather than hours of labor.\n\n### Multi-Asset Autonomy\nNever rely on a single income stream. Build small, micro-enterprise services that leverage automated delivery systems.",
+      "readTime": "6 min read",
+      "createdAt": "2026-06-05T09:30:00.000Z",
+      "updatedAt": "2026-06-05T09:30:00.000Z",
+      "views": 56
+    },
+    {
+      "id": "4",
+      "title": "Heuristics for Fluid Metacognition",
+      "topic": "Mindset Engineering",
+      "category": "Self",
+      "subject": "Mindset Engineering",
+      "featuredImage": "https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&q=80&w=800",
+      "content": "How we think about how we think determines our evolutionary limit. We map the mental architecture required to break old paradigms.\n\n### The First Principles Filter\nDeconstruct any belief or problem into its most fundamental truths, then build up your understanding from scratch. Avoid analogy biases.\n\n### Emotional Regulation Habit\nRecognize emotional arousal as physical data rather than absolute truth.",
+      "readTime": "5 min read",
+      "createdAt": "2026-06-08T14:15:00.000Z",
+      "updatedAt": "2026-06-08T14:15:00.000Z",
+      "views": 88
+    }
+  ],
+  "users": [
+    {
+      "email": "heena03kaur@gmail.com",
+      "name": "Heena Kaur",
+      "googleAuth": false,
+      "createdAt": "2026-06-17T04:33:32.128Z",
+      "isAdmin": true
+    }
+  ],
+  "sessions": [
+    {
+      "sessionId": "s-c0fscd4",
+      "email": null,
+      "device": "Mobile",
+      "path": "/blogs",
+      "durationSeconds": 20,
+      "lastActive": "2026-06-17T04:33:59.695Z"
+    },
+    {
+      "sessionId": "s-1aw5p2o",
+      "email": null,
+      "device": "Mobile",
+      "path": "/blogs",
+      "durationSeconds": 170,
+      "lastActive": "2026-06-17T04:38:13.381Z"
+    }
+  ],
+  "passwords": {
+    "heena03kaur@gmail.com": "Love_yourself03!"
+  }
+}
