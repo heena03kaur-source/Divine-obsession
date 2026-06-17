@@ -136,7 +136,9 @@ const authenticateToken = (req: express.Request, res: express.Response, next: ex
   if (token.startsWith("token-") || token.startsWith("oauth-token-")) {
     const parts = token.split("-");
     const email = token.startsWith("oauth-token-") ? parts[2] : parts[1];
-    const targetEmail = email || DEFAULT_OWNER_EMAIL;
+    if (!email) return res.status(401).json({ error: "Access Denied: Invalid Token." });
+    
+    const targetEmail = email;
     const userObj = db.users.find((u) => u.email.toLowerCase() === targetEmail.toLowerCase());
     if (userObj) {
       (req as any).user = userObj;
@@ -237,12 +239,28 @@ router.post("/login", (req, res) => {
   res.json({ token: `token-${userObj.email}-${Date.now()}`, email: userObj.email, isAdmin: !!userObj.isAdmin });
 });
 
+const ADMIN_EMAILS = ["admin@deepora.com", "owner@deepora.com", "heena03kaur@gmail.com"];
+
 router.post("/register", (req, res) => {
   const { email, password, name } = req.body;
   const normalizedEmail = email?.trim().toLowerCase();
-  if (db.users.find((u) => u.email.toLowerCase() === normalizedEmail)) return res.status(400).json({ error: "Email exists." });
+  
+  if (!normalizedEmail) return res.status(400).json({ error: "Email required." });
+  
+  if (db.users.find((u) => u.email.toLowerCase() === normalizedEmail)) {
+    return res.status(400).json({ error: "Email exists." });
+  }
 
-  const newUser: User = { email: normalizedEmail, name: name.trim(), googleAuth: false, createdAt: new Date().toISOString(), isAdmin: normalizedEmail === DEFAULT_OWNER_EMAIL };
+  const isAdmin = ADMIN_EMAILS.includes(normalizedEmail);
+
+  const newUser: User = { 
+    email: normalizedEmail, 
+    name: name.trim(), 
+    googleAuth: false, 
+    createdAt: new Date().toISOString(), 
+    isAdmin 
+  };
+  
   db.users.push(newUser);
   dbPasswords[normalizedEmail] = password;
   saveDB();

@@ -23,15 +23,16 @@ export default function App() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [activeSubject, setActiveSubject] = useState<string | null>(null);
   
-  const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
   const [openSettingsMenu, setOpenSettingsMenu] = useState<boolean>(false);
 
-  // Auth States
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem("sage_blog_token"));
+  const initialToken = localStorage.getItem("sage_blog_token");
+  const [token, setToken] = useState<string | null>(initialToken);
   const [userEmail, setUserEmail] = useState<string | null>(() => localStorage.getItem("sage_blog_email"));
   const [isAdmin, setIsAdmin] = useState<boolean>(
     () => localStorage.getItem("sage_blog_is_admin") === "true"
   );
+  
+  const [isAuthOpen, setIsAuthOpen] = useState<boolean>(!initialToken);
 
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -113,6 +114,34 @@ export default function App() {
       console.error("Auto-heal process error:", e);
     }
   };
+
+  useEffect(() => {
+    if (!token) {
+      setIsAuthOpen(true);
+      if (["write", "settings-edit", "admin-dashboard"].includes(currentTab)) {
+        setCurrentTab("blogs");
+      }
+    } else if (!isAdmin && ["write", "settings-edit", "admin-dashboard"].includes(currentTab)) {
+      setCurrentTab("blogs");
+    }
+  }, [token, isAdmin, currentTab]);
+
+  useEffect(() => {
+    // Prevent frontend local storage spoofing
+    if (token && isAdmin) {
+      fetch("/api/admin/metrics", {
+        headers: { Authorization: `Bearer ${token}` }
+      }).then(res => {
+        if (!res.ok) {
+          setIsAdmin(false);
+          localStorage.setItem("sage_blog_is_admin", "false");
+          if (["write", "settings-edit", "admin-dashboard"].includes(currentTab)) {
+            setCurrentTab("blogs");
+          }
+        }
+      }).catch(() => {});
+    }
+  }, [token, isAdmin, currentTab]);
 
   // Fetch blogs on load
   const loadPosts = async () => {
@@ -447,8 +476,11 @@ export default function App() {
 
       <AuthModal
         isOpen={isAuthOpen}
-        onClose={() => setIsAuthOpen(false)}
+        onClose={() => {
+          if (token) setIsAuthOpen(false);
+        }}
         onLoginSuccess={handleLoginSuccess}
+        closable={!!token}
       />
 
       {/* Structured elegant decoration footer */}

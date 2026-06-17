@@ -5,9 +5,10 @@ interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLoginSuccess: (token: string, email: string, isAdmin: boolean) => void;
+  closable?: boolean;
 }
 
-export function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModalProps) {
+export function AuthModal({ isOpen, onClose, onLoginSuccess, closable = true }: AuthModalProps) {
   const [tab, setTab] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -127,13 +128,15 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModalProps) {
               Access administrative features or standard reader mode
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-            id="login-modal-close"
-          >
-            <X size={18} />
-          </button>
+          {closable && (
+            <button
+              onClick={onClose}
+              className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+              id="login-modal-close"
+            >
+              <X size={18} />
+            </button>
+          )}
         </div>
 
         <div className="flex border-b border-[#7DB095]/10 bg-white" id="login-modal-tabs">

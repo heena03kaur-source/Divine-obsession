@@ -150,7 +150,9 @@ async function startServer() {
     if (token.startsWith("token-") || token.startsWith("oauth-token-")) {
       const parts = token.split("-");
       const email = token.startsWith("oauth-token-") ? parts[2] : parts[1];
-      const targetEmail = email || DEFAULT_OWNER_EMAIL;
+      if (!email) return res.status(401).json({ error: "Access Denied: Invalid Token." });
+      
+      const targetEmail = email;
       const userObj = db.users.find((u) => u.email.toLowerCase() === targetEmail.toLowerCase());
       if (userObj) {
         (req as any).user = userObj;
@@ -342,14 +344,15 @@ async function startServer() {
       return res.status(400).json({ error: "Email address is already in active service." });
     }
 
-    const isFirstOwner = normalizedEmail === DEFAULT_OWNER_EMAIL;
+    const ADMIN_EMAILS = ["admin@deepora.com", "owner@deepora.com", "heena03kaur@gmail.com"];
+    const isAdmin = ADMIN_EMAILS.includes(normalizedEmail);
 
     const newUser: User = {
       email: normalizedEmail,
       name: name.trim(),
       googleAuth: false,
       createdAt: new Date().toISOString(),
-      isAdmin: isFirstOwner, // Auto-admin if registering default owner
+      isAdmin: isAdmin,
     };
 
     db.users.push(newUser);
@@ -486,6 +489,7 @@ async function startServer() {
 
   // Google OAuth callback simulation page setup
   app.get("/api/auth/google/callback", (req, res) => {
+    const mockEmail = "visitor@example.com";
     res.send(`
       <!DOCTYPE html>
       <html>
@@ -506,9 +510,9 @@ async function startServer() {
               if (window.opener) {
                 window.opener.postMessage({
                   type: 'OAUTH_AUTH_SUCCESS',
-                  token: 'oauth-token-${DEFAULT_OWNER_EMAIL}-${Date.now()}',
-                  email: '${DEFAULT_OWNER_EMAIL}',
-                  isAdmin: true
+                  token: 'oauth-token-'+'${mockEmail}'+'-${Date.now()}',
+                  email: '${mockEmail}',
+                  isAdmin: false
                 }, '*');
               }
               window.close();
