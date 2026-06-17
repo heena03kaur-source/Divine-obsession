@@ -2,27 +2,20 @@ import { Block } from "../types";
 
 export const FONT_OPTIONS = [
   { id: "font-serif", name: "Lora (Default Serif)", className: "font-serif" },
-  {
-    id: "font-playfair",
-    name: "Playfair Display (Elegant Serif)",
-    className: "font-playfair",
-  },
-  {
-    id: "font-cinzel",
-    name: "Cinzel (Gothic Roman)",
-    className: "font-cinzel",
-  },
-  {
-    id: "font-space",
-    name: "Space Grotesk (Tech Sans)",
-    className: "font-space",
-  },
+  { id: "font-playfair", name: "Playfair Display (Elegant Serif)", className: "font-playfair" },
+  { id: "font-merriweather", name: "Merriweather (Classic Serif)", className: "font-merriweather" },
+  { id: "font-libre", name: "Libre Baskerville (Editorial)", className: "font-libre" },
+  { id: "font-crimson", name: "Crimson Text (Book Serif)", className: "font-crimson" },
+  
   { id: "font-sans", name: "Inter (Modern Sans)", className: "font-sans" },
-  {
-    id: "font-mono",
-    name: "JetBrains Mono (Writer Mono)",
-    className: "font-mono",
-  },
+  { id: "font-poppins", name: "Poppins (Geometric Sans)", className: "font-poppins" },
+  { id: "font-manrope", name: "Manrope (Clean Sans)", className: "font-manrope" },
+  { id: "font-montserrat", name: "Montserrat (Bold Sans)", className: "font-montserrat" },
+  { id: "font-open-sans", name: "Open Sans (Friendly Sans)", className: "font-open-sans" },
+  
+  { id: "font-cinzel", name: "Cinzel (Gothic Roman)", className: "font-cinzel" },
+  { id: "font-space", name: "Space Grotesk (Tech Sans)", className: "font-space" },
+  { id: "font-mono", name: "JetBrains Mono (Writer Mono)", className: "font-mono" },
 ];
 
 export function getFontClassName(fontId: string): string {

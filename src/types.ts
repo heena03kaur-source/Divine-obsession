@@ -3,17 +3,27 @@ export interface TextBlock {
   type: "text";
   text: string;
   fontId?: string;
+  formatting?: "h1" | "h2" | "h3" | "h4" | "p" | "quote";
+  align?: "left" | "center" | "right" | "justify";
+}
+
+export interface AdvancedBlock {
+  id: string;
+  type: "highlight" | "callout" | "pullquote" | "summary" | "step" | "timeline" | "faq" | "takeaways" | "code" | "table" | "divider";
+  content: string; // JSON data specific to the block
 }
 
 export interface ImageBlock {
   id: string;
   type: "image";
   url: string;
+  urls?: string[]; // for gallery/carousel
   caption?: string;
-  style?: "center" | "full" | "side";
+  style?: "center" | "full" | "side" | "gallery" | "carousel" | "hero" | "text-beside";
+  textBeside?: string;
 }
 
-export type Block = TextBlock | ImageBlock;
+export type Block = TextBlock | ImageBlock | AdvancedBlock;
 
 export interface Post {
   id: string;
@@ -24,11 +34,22 @@ export interface Post {
   featuredImage: string;
   content: string; // JSON blocks-v1 string or plain text
   readTime: string;
-  createdAt: string; // ISO date string or formatted date
+  createdAt: string; 
   updatedAt: string;
   deleted?: boolean;
   deletedAt?: string;
   views?: number;
+  
+  // SEO & Layout new fields
+  metaTitle?: string;
+  metaDescription?: string;
+  slug?: string;
+  canonicalUrl?: string;
+  ogImage?: string;
+  schemaMarkup?: string;
+  focusKeyword?: string;
+  layoutStyle?: "centered" | "wide" | "magazine" | "minimal";
+  status?: "draft" | "scheduled" | "published";
 }
 
 export interface User {

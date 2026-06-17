@@ -184,7 +184,10 @@ async function startServer() {
 
   // 3. POST /api/posts - Create a new post
   app.post("/api/posts", authenticateToken, requireAdmin, (req, res) => {
-    const { id, title, topic, content, category, subject, featuredImage } = req.body;
+    const { 
+      id, title, topic, content, category, subject, featuredImage,
+      metaTitle, metaDescription, slug, canonicalUrl, ogImage, schemaMarkup, focusKeyword, layoutStyle, status 
+    } = req.body;
     if (!title || !content) {
       return res.status(400).json({ error: "Title and content blocks are required specifications." });
     }
@@ -201,6 +204,15 @@ async function startServer() {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       views: 0,
+      metaTitle,
+      metaDescription,
+      slug,
+      canonicalUrl,
+      ogImage,
+      schemaMarkup,
+      focusKeyword,
+      layoutStyle: layoutStyle || "aligned",
+      status: status || "published",
     };
 
     if (id) {
@@ -214,7 +226,10 @@ async function startServer() {
   // 4. PUT /api/posts/:id - Edit an existing post
   app.put("/api/posts/:id", authenticateToken, requireAdmin, (req, res) => {
     const { id } = req.params;
-    const { title, topic, content, category, subject, featuredImage } = req.body;
+    const { 
+      title, topic, content, category, subject, featuredImage,
+      metaTitle, metaDescription, slug, canonicalUrl, ogImage, schemaMarkup, focusKeyword, layoutStyle, status
+    } = req.body;
 
     const postIndex = db.posts.findIndex((p) => String(p.id) === String(id));
     if (postIndex === -1) {
@@ -230,6 +245,15 @@ async function startServer() {
       content: content !== undefined ? content : db.posts[postIndex].content,
       featuredImage: featuredImage !== undefined ? featuredImage.trim() : db.posts[postIndex].featuredImage,
       updatedAt: new Date().toISOString(),
+      metaTitle: metaTitle !== undefined ? metaTitle : db.posts[postIndex].metaTitle,
+      metaDescription: metaDescription !== undefined ? metaDescription : db.posts[postIndex].metaDescription,
+      slug: slug !== undefined ? slug : db.posts[postIndex].slug,
+      canonicalUrl: canonicalUrl !== undefined ? canonicalUrl : db.posts[postIndex].canonicalUrl,
+      ogImage: ogImage !== undefined ? ogImage : db.posts[postIndex].ogImage,
+      schemaMarkup: schemaMarkup !== undefined ? schemaMarkup : db.posts[postIndex].schemaMarkup,
+      focusKeyword: focusKeyword !== undefined ? focusKeyword : db.posts[postIndex].focusKeyword,
+      layoutStyle: layoutStyle !== undefined ? layoutStyle : db.posts[postIndex].layoutStyle,
+      status: status !== undefined ? status : db.posts[postIndex].status,
     };
 
     db.posts[postIndex] = updatedPost;

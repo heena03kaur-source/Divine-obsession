@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { ArrowLeft, Edit, Trash2, Calendar, Hash, Heart } from "lucide-react";
-import { Post } from "../types";
+import { Post, ImageBlock } from "../types";
 import { parseBlockContent, getFontClassName } from "../utils/blocks";
+import parse from "html-react-parser";
 
 interface BlogReaderProps {
   post: Post;
@@ -46,9 +47,22 @@ export function BlogReader({
     }
   };
 
+  const getLayoutClasses = () => {
+    switch (post.layoutStyle) {
+      case "wide":
+        return "max-w-5xl mx-auto px-6 py-12 md:py-16 text-lg md:text-xl";
+      case "magazine":
+        return "max-w-6xl mx-auto px-6 py-12 md:py-20 text-base columns-1 md:columns-2 gap-12 font-serif bg-orange-50/10";
+      case "minimal":
+        return "max-w-2xl mx-auto px-6 py-10 md:py-16 text-md font-sans tracking-tight text-gray-800";
+      default: // centered
+        return "max-w-3xl mx-auto px-6 py-12 md:py-16 text-left text-base md:text-lg text-[#2D3748]";
+    }
+  };
+
   return (
     <article
-      className="max-w-3xl mx-auto px-6 py-12 md:py-16 animate-in fade-in duration-200 text-left"
+      className={`animate-in fade-in duration-200 ${getLayoutClasses()}`}
       id="post-detail-page"
     >
       {/* Top action row */}
@@ -160,7 +174,7 @@ export function BlogReader({
 
       {/* Styled content block series */}
       <section
-        className={`text-[#2D3748] text-base md:text-lg leading-relaxed text-left max-w-none prose prose-slate ${getFontClassName(
+        className={`leading-relaxed prose prose-slate max-w-none w-full ${post.layoutStyle === "magazine" ? "pr-0" : ""} ${getFontClassName(
           globalFont
         )}`}
         id="post-content"
@@ -174,45 +188,118 @@ export function BlogReader({
                   ? getFontClassName(block.fontId)
                   : "";
               return (
-                <p
+                <div
                   key={block.id || idx}
-                  className={`whitespace-pre-wrap leading-relaxed ${overrideFont}`}
+                  className={`rich-text-content leading-relaxed ${overrideFont}`}
                 >
-                  {block.text}
-                </p>
+                  {parse(block.text)}
+                </div>
               );
             } else if (block.type === "image") {
               if (!block.url.trim()) return null;
-              const isFull = block.style === "full";
-              const isSide = block.style === "side";
+              
+              const imgBlock = block as ImageBlock;
+              let content;
+              const allUrls = [imgBlock.url, ...(imgBlock.urls || [])].filter(Boolean);
+
+              if (imgBlock.style === "gallery") {
+                content = (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    {allUrls.map((u, i) => (
+                      <div key={i} className="aspect-square overflow-hidden rounded-xl border border-gray-100"><img src={u} referrerPolicy="no-referrer" className="w-full h-full object-cover"/></div>
+                    ))}
+                  </div>
+                );
+              } else if (imgBlock.style === "carousel") {
+                content = (
+                  <div className="flex overflow-x-auto gap-3 snap-x pb-4">
+                    {allUrls.map((u, i) => (
+                      <div key={i} className="snap-center shrink-0 w-4/5 md:w-2/3 h-[300px] overflow-hidden rounded-xl border border-gray-100"><img src={u} referrerPolicy="no-referrer" className="w-full h-full object-cover"/></div>
+                    ))}
+                  </div>
+                );
+              } else if (imgBlock.style === "text-beside") {
+                content = (
+                  <div className="flex flex-col md:flex-row gap-6 items-center">
+                    <div className="w-full md:w-1/2 overflow-hidden rounded-xl border border-gray-100"><img src={imgBlock.url} referrerPolicy="no-referrer" className="w-full object-cover"/></div>
+                    <div className="w-full md:w-1/2 text-sm text-gray-700 italic border-l-2 border-[#7DB095] pl-4">{imgBlock.textBeside}</div>
+                  </div>
+                );
+              } else {
+                const isFull = imgBlock.style === "full" || imgBlock.style === "hero";
+                const isHero = imgBlock.style === "hero";
+                const isSide = imgBlock.style === "side";
+                content = (
+                  <div className="overflow-hidden rounded-2xl border border-[#7DB095]/15 bg-[#FAF9F6] p-1.5 shadow-sm hover:shadow-md transition-shadow">
+                    <img
+                      src={imgBlock.url}
+                      alt={imgBlock.caption || "Illustration"}
+                      referrerPolicy="no-referrer"
+                      className="w-full object-cover rounded-xl select-none"
+                      style={{ maxHeight: isHero ? "600px" : isSide ? "300px" : "480px" }}
+                    />
+                  </div>
+                );
+              }
 
               return (
                 <figure
                   key={block.id || idx}
                   className={`my-8 clear-both transition-all duration-300 ${
-                    isFull
+                    imgBlock.style === "full" || imgBlock.style === "hero"
                       ? "w-full"
-                      : isSide
+                      : imgBlock.style === "side"
                       ? "sm:float-right sm:max-w-xs sm:ml-6 sm:mb-4 w-full"
                       : "mx-auto max-w-2xl text-center"
                   }`}
                 >
-                  <div className="overflow-hidden rounded-2xl border border-[#7DB095]/15 bg-[#FAF9F6] p-1.5 shadow-sm hover:shadow-md transition-shadow">
-                    <img
-                      src={block.url}
-                      alt={block.caption || "Journal illustration"}
-                      referrerPolicy="no-referrer"
-                      className="w-full object-cover rounded-xl select-none"
-                      style={{ maxHeight: isSide ? "300px" : "480px" }}
-                    />
-                  </div>
-                  {block.caption && (
+                  {content}
+                  {imgBlock.caption && (
                     <figcaption className="mt-2.5 text-center text-[10px] md:text-xs text-gray-400 font-mono tracking-wider italic uppercase px-4">
-                      — {block.caption}
+                      — {imgBlock.caption}
                     </figcaption>
                   )}
                 </figure>
               );
+            } else if (block.type) {
+                // AdvancedBlocks
+                const adv = block as any;
+                let c;
+                try {
+                   c = adv.content.startsWith('{') || adv.content.startsWith('[') ? JSON.parse(adv.content) : adv.content;
+                } catch {
+                   c = adv.content;
+                }
+                const contentStr = typeof c === 'string' ? c : JSON.stringify(c, null, 2);
+
+                if (block.type === 'highlight') {
+                  return <div key={block.id} className="bg-yellow-50 border-l-4 border-yellow-400 p-6 my-6 rounded-r-xl shadow-sm text-yellow-900 font-medium">{contentStr}</div>;
+                } else if (block.type === 'callout') {
+                  return <div key={block.id} className="bg-blue-50 border border-blue-100 p-6 my-6 rounded-xl text-blue-800 text-sm flex gap-4 items-start"><span className="text-blue-400 font-bold text-xl leading-none">!</span> <div>{contentStr}</div></div>;
+                } else if (block.type === 'pullquote') {
+                  const q = typeof c === 'object' && c.quote ? c.quote : contentStr;
+                  const auth = typeof c === 'object' && c.author ? c.author : '';
+                  return <blockquote key={block.id} className="text-2xl md:text-3xl font-serif text-[#7DB095] italic text-center my-10 py-6 border-y border-[#7DB095]/20">"{q}"{auth && <footer className="text-sm text-gray-400 mt-4 not-italic font-sans uppercase tracking-widest">— {auth}</footer>}</blockquote>;
+                } else if (block.type === 'summary') {
+                  return <div key={block.id} className="bg-[#FAF9F6] border border-[#7DB095]/30 p-8 my-8 rounded-2xl text-center shadow-sm"><h4 className="text-xs font-black uppercase tracking-[0.2em] text-[#7DB095] mb-4">Summary</h4><div className="text-gray-700 italic">{contentStr}</div></div>;
+                } else if (block.type === 'step') {
+                  const title = typeof c === 'object' && c.title ? c.title : `Step`;
+                  const desc = typeof c === 'object' && c.description ? c.description : contentStr;
+                  return <div key={block.id} className="flex gap-6 my-8 items-start"><div className="w-12 h-12 bg-[#7DB095] text-white rounded-2xl flex items-center justify-center font-bold font-mono shrink-0 shadow-md">0{idx}</div><div><h3 className="text-xl font-bold mb-2">{title}</h3><p className="text-gray-600 leading-relaxed">{desc}</p></div></div>;
+                } else if (block.type === 'timeline') {
+                   const title = typeof c === 'object' && c.title ? c.title : `Event`;
+                   const desc = typeof c === 'object' && c.description ? c.description : contentStr;
+                   return <div key={block.id} className="border-l-2 border-[#7DB095]/30 pl-6 my-6 ml-6 relative"><div className="absolute w-3 h-3 bg-[#7DB095] rounded-full -left-[7px] top-2" /><h4 className="font-bold text-lg mb-1">{title}</h4><p className="text-gray-600 text-sm">{desc}</p></div>;
+                } else if (block.type === 'faq') {
+                   const q = typeof c === 'object' && c.question ? c.question : 'Question?';
+                   const a = typeof c === 'object' && c.answer ? c.answer : contentStr;
+                   return <div key={block.id} className="border-b border-gray-200 py-4"><h4 className="font-bold cursor-pointer text-[#7DB095]">{q}</h4><p className="mt-2 text-gray-600">{a}</p></div>;
+                } else if (block.type === 'takeaways') {
+                   const items = Array.isArray(c) ? c : typeof c === 'object' && c.items ? c.items : [contentStr];
+                   return <div key={block.id} className="bg-emerald-50 rounded-2xl p-6 md:p-8 my-8 border border-emerald-100"><h4 className="font-black text-xs uppercase tracking-widest text-[#7DB095] mb-4">Key Takeaways</h4><ul className="space-y-3">{items.map((it:string, i:number)=>(<li key={i} className="flex gap-3 items-start"><span className="text-[#7DB095] font-bold mt-1">✓</span> <span className="text-gray-800 font-medium">{it}</span></li>))}</ul></div>;
+                } else {
+                   return <div key={block.id} className="p-4 bg-gray-50 border my-4 font-mono text-xs">{contentStr}</div>;
+                }
             }
             return null;
           })}

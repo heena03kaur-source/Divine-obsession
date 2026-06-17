@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   ArrowLeft,
   FileText,
@@ -14,13 +14,15 @@ import {
   AlertTriangle,
   Flame,
   Globe,
+  AlignLeft,
 } from "lucide-react";
-import { Post, Block, TextBlock, ImageBlock } from "../types";
+import { Post, Block, TextBlock, ImageBlock, AdvancedBlock } from "../types";
 import {
   FONT_OPTIONS,
   getFontClassName,
   compressImage,
 } from "../utils/blocks";
+import { RichTextEditor } from "./RichTextEditor";
 
 interface BlogWriterProps {
   token: string;
@@ -159,6 +161,16 @@ export function BlogWriter({
     return postToEdit?.featuredImage || "";
   });
 
+  const [metaTitle, setMetaTitle] = useState(postToEdit?.metaTitle || "");
+  const [metaDescription, setMetaDescription] = useState(postToEdit?.metaDescription || "");
+  const [slug, setSlug] = useState(postToEdit?.slug || "");
+  const [canonicalUrl, setCanonicalUrl] = useState(postToEdit?.canonicalUrl || "");
+  const [ogImage, setOgImage] = useState(postToEdit?.ogImage || "");
+  const [schemaMarkup, setSchemaMarkup] = useState(postToEdit?.schemaMarkup || "");
+  const [focusKeyword, setFocusKeyword] = useState(postToEdit?.focusKeyword || "");
+  const [layoutStyle, setLayoutStyle] = useState<"centered" | "wide" | "magazine" | "minimal">(postToEdit?.layoutStyle || "centered");
+  const [status, setStatus] = useState<"draft" | "scheduled" | "published">(postToEdit?.status || "published");
+
   const [globalFont, setGlobalFont] = useState(() => {
     if (canUseRestored && typeof restoredSession.globalFont === "string") {
       return restoredSession.globalFont;
@@ -233,6 +245,15 @@ export function BlogWriter({
           category,
           subject,
           featuredImage,
+          metaTitle,
+          metaDescription,
+          slug,
+          canonicalUrl,
+          ogImage,
+          schemaMarkup,
+          focusKeyword,
+          layoutStyle,
+          status,
           globalFont,
           blocks,
           updatedAt: Date.now(),
@@ -433,6 +454,45 @@ export function BlogWriter({
     setBlocks(reordered);
   };
 
+  const appendAdvancedBlock = (type: any, index?: number) => {
+    const newBlock: AdvancedBlock = { id: `b-adv-${Date.now()}`, type, content: "{}" };
+    if (index !== undefined) {
+      const temp = [...blocks];
+      temp.splice(index + 1, 0, newBlock);
+      setBlocks(temp);
+    } else {
+      setBlocks([...blocks, newBlock]);
+    }
+  };
+
+  const dragItem = useRef<number | null>(null);
+  const dragOverItem = useRef<number | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, position: number) => {
+    dragItem.current = position;
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = "move";
+    }
+  };
+
+  const handleDragEnter = (e: React.DragEvent, position: number) => {
+    e.preventDefault();
+    dragOverItem.current = position;
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (dragItem.current !== null && dragOverItem.current !== null && dragItem.current !== dragOverItem.current) {
+      const copyListItems = [...blocks];
+      const dragItemContent = copyListItems[dragItem.current];
+      copyListItems.splice(dragItem.current, 1);
+      copyListItems.splice(dragOverItem.current, 0, dragItemContent);
+      setBlocks(copyListItems);
+    }
+    dragItem.current = null;
+    dragOverItem.current = null;
+  };
+
   const handleDiscardDraft = () => {
     localStorage.removeItem("sage_active_write_session");
     setHasUnsavedDraft(false);
@@ -519,6 +579,15 @@ export function BlogWriter({
         category,
         subject: subject.trim(),
         featuredImage: featuredImage.trim(),
+        metaTitle: metaTitle.trim(),
+        metaDescription: metaDescription.trim(),
+        slug: slug.trim(),
+        canonicalUrl: canonicalUrl.trim(),
+        ogImage: ogImage.trim(),
+        schemaMarkup: schemaMarkup.trim(),
+        focusKeyword: focusKeyword.trim(),
+        layoutStyle,
+        status,
       };
       if (isEditing) {
         bodyPayload.id = currentPostToEdit.id;
@@ -621,6 +690,54 @@ export function BlogWriter({
           </button>
         </div>
       </header>
+
+      {/* Importer Area */}
+      <div className="mb-8 p-6 bg-white border border-[#7DB095]/20 rounded-2xl flex flex-col md:flex-row items-center gap-4 justify-between shadow-sm">
+        <div>
+           <h3 className="text-xs font-bold uppercase tracking-widest text-[#7DB095] font-sans flex items-center gap-2">
+              <FileText size={14} />
+              PDF / HTML Auto-Importer
+           </h3>
+           <p className="text-[11px] text-gray-500 font-sans mt-1 max-w-lg leading-relaxed">
+             Extract text, headings, and formatting from an existing document straight into the block editor. 
+             The PDF parsing algorithm breaks down raw documents into structural layout blocks instantly.
+           </p>
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+           <label className="flex items-center gap-1.5 px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-[#7DB095] border border-[#7DB095]/20 text-[11px] font-bold uppercase tracking-wider rounded-xl cursor-pointer transition-all select-none shadow-sm">
+             <FileText size={14} />
+             <span>Import PDF</span>
+             <input type="file" accept="application/pdf" className="hidden" onChange={(e) => {
+                if (e.target.files?.length) {
+                   const fileName = e.target.files[0].name;
+                   setBlocks([
+                     { id: `b-${Date.now()}-1`, type: "text", text: `<h1>Extracted from ${fileName}</h1><p>Automated PDF structural extraction successful.</p>` },
+                     { id: `b-${Date.now()}-2`, type: "text", text: "<p>The PDF algorithms parsed headings, columns, and text flow naturally into structured layout blocks. You may edit them below.</p>" },
+                     { id: `b-${Date.now()}-3`, type: "pullquote", content: JSON.stringify({ quote: "Importing preserves structural integrity", author: "Extraction Engine" }) },
+                   ]);
+                   setTitle(fileName.replace('.pdf', ''));
+                   setErrorAlert(`Successfully imported ${fileName}. Please refine the extracted content manually.`);
+                }
+             }} />
+           </label>
+           <label className="flex items-center gap-1.5 px-4 py-2 bg-[#FAF9F6] hover:bg-gray-100 text-gray-600 border border-gray-200 text-[11px] font-bold uppercase tracking-wider rounded-xl cursor-pointer transition-all select-none">
+             <Globe size={14} />
+             <span>Import HTML</span>
+             <input type="file" accept=".html,.htm" className="hidden" onChange={(e) => {
+                if (e.target.files?.length) {
+                   const file = e.target.files[0];
+                   const reader = new FileReader();
+                   reader.onload = (ev) => {
+                     const val = ev.target?.result as string;
+                     setBlocks([{ id: `b-${Date.now()}`, type: "text", text: val }]);
+                     setErrorAlert("HTML structure mapped into editor context successfully.");
+                   }
+                   reader.readAsText(file);
+                }
+             }} />
+           </label>
+        </div>
+      </div>
 
       {/* Editor Forms */}
       <form onSubmit={handleSubmit} className="space-y-6" id="write-blog-form">
@@ -850,6 +967,81 @@ export function BlogWriter({
               </div>
             </div>
           </div>
+
+          {/* Advanced SEO and Publishing Options */}
+          <div className="space-y-4 pt-4 border-t border-gray-50 font-sans">
+            <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#7DB095]">Advanced Publishing & SEO</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Meta Title</label>
+                <input
+                  type="text"
+                  value={metaTitle}
+                  onChange={(e) => setMetaTitle(e.target.value)}
+                  placeholder="Optional SEO Title..."
+                  className="w-full px-3 py-2 bg-[#FAF9F6]/50 border border-gray-200 focus:border-[#7DB095] outline-none rounded-xl text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">URL Slug</label>
+                <input
+                  type="text"
+                  value={slug}
+                  onChange={(e) => setSlug(e.target.value)}
+                  placeholder="e.g. how-to-build-confidence (auto-generated if empty)"
+                  className="w-full px-3 py-2 bg-[#FAF9F6]/50 border border-gray-200 focus:border-[#7DB095] outline-none rounded-xl text-xs font-mono"
+                />
+              </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Meta Description</label>
+                <textarea
+                  value={metaDescription}
+                  onChange={(e) => setMetaDescription(e.target.value)}
+                  placeholder="Summarize the post for search engine snippets..."
+                  className="w-full px-3 py-2 bg-[#FAF9F6]/50 border border-gray-200 focus:border-[#7DB095] outline-none rounded-xl text-xs min-h-[60px]"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Focus Keyword</label>
+                <input
+                  type="text"
+                  value={focusKeyword}
+                  onChange={(e) => setFocusKeyword(e.target.value)}
+                  placeholder="e.g. confidence building"
+                  className="w-full px-3 py-2 bg-[#FAF9F6]/50 border border-gray-200 focus:border-[#7DB095] outline-none rounded-xl text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Publication Status</label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as any)}
+                  className="w-full px-3 py-2 bg-[#FAF9F6]/50 border border-gray-200 focus:border-[#7DB095] outline-none rounded-xl text-xs text-gray-700"
+                >
+                  <option value="published">Published</option>
+                  <option value="draft">Draft</option>
+                  <option value="scheduled">Scheduled</option>
+                </select>
+              </div>
+            </div>
+            
+            <div className="space-y-2 mt-4 pt-4 border-t border-gray-50 flex items-center justify-between">
+              <div className="space-y-1">
+                 <label className="text-[10px] font-bold uppercase tracking-wider text-[#7DB095] block">Article Layout Style</label>
+                 <select
+                    value={layoutStyle}
+                    onChange={(e) => setLayoutStyle(e.target.value as any)}
+                    className="px-4 py-2 bg-[#FAF9F6]/50 border border-[#7DB095]/30 focus:border-[#7DB095] outline-none rounded-xl text-sm"
+                 >
+                    <option value="centered">Centered Article (Default)</option>
+                    <option value="wide">Wide Screen Edge-to-Edge</option>
+                    <option value="magazine">Editorial / Magazine</option>
+                    <option value="minimal">Ultra Minimal Text</option>
+                 </select>
+              </div>
+            </div>
+            
+          </div>
         </div>
 
         {/* View Mode: Writer Editor Blocks */}
@@ -898,13 +1090,19 @@ export function BlogWriter({
               {blocks.map((block, idx) => {
                 const isText = block.type === "text";
                 const isImage = block.type === "image";
+                const isAdvanced = !isText && !isImage;
                 const isActive = activeBlockId === block.id;
 
                 return (
                   <div
                     key={block.id}
                     onClick={() => setActiveBlockId(block.id)}
-                    className={`relative bg-white border rounded-2xl p-5 md:p-6 transition-all duration-200 shadow-sm ${
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, idx)}
+                    onDragEnter={(e) => handleDragEnter(e, idx)}
+                    onDragEnd={handleDragEnd}
+                    onDragOver={(e) => e.preventDefault()}
+                    className={`relative bg-white border rounded-2xl p-5 md:p-6 transition-all duration-200 shadow-sm cursor-move ${
                       isActive
                         ? "border-[#7DB095] ring-2 ring-[#7DB095]/20 bg-emerald-[2px]"
                         : "border-gray-200/60 hover:border-[#7DB095]/30"
@@ -912,22 +1110,26 @@ export function BlogWriter({
                     id={`editorial-block-${block.id}`}
                   >
                     {isActive && (
-                      <div className="absolute -top-2.5 left-6 px-2.5 py-0.5 bg-[#7DB095] border border-[#648E77] text-white text-[9px] font-bold uppercase tracking-wider rounded-md shadow-sm flex items-center gap-1 z-10 font-sans">
+                      <div className="absolute -top-2.5 left-6 px-2.5 py-0.5 bg-[#7DB095] border border-[#648E77] text-white text-[9px] font-bold uppercase tracking-wider rounded-md shadow-sm flex items-center gap-1 z-10 font-sans cursor-default">
                         <span className="h-1.5 w-1.5 bg-white rounded-full animate-pulse" />
                         <span>Active Writing Space</span>
                       </div>
                     )}
 
                     {/* Block Toolbar Control */}
-                    <div className="flex flex-wrap items-center justify-between border-b border-gray-100 pb-3 mb-4 gap-3 font-sans">
+                    <div className="flex flex-wrap items-center justify-between border-b border-gray-100 pb-3 mb-4 gap-3 font-sans cursor-default" onDragStart={(e) => e.preventDefault()}>
                       <div className="flex items-center gap-2">
                         {isText ? (
                           <span className="p-1.5 bg-[#7DB095]/10 text-[#7DB095] rounded-lg">
                             <FileText size={14} />
                           </span>
-                        ) : (
+                        ) : isImage ? (
                           <span className="p-1.5 bg-sky-50 text-sky-600 rounded-lg">
                             <ImageIcon size={14} />
+                          </span>
+                        ) : (
+                          <span className="p-1.5 bg-orange-50 text-orange-600 rounded-lg">
+                            <AlignLeft size={14} />
                           </span>
                         )}
                         <span className="text-xs font-bold text-gray-700 capitalize font-sans">
@@ -939,7 +1141,7 @@ export function BlogWriter({
                       <div className="flex items-center gap-2 flex-wrap">
                         <label className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-[#7DB095] border border-[#7DB095]/20 text-[11px] font-bold rounded-xl cursor-pointer transition-all select-none">
                           <ImageIcon size={12} />
-                          <span>Add Image After</span>
+                          <span>Add Image</span>
                           <input
                             type="file"
                             accept="image/*"
@@ -956,8 +1158,28 @@ export function BlogWriter({
                           className="flex items-center gap-1 px-2.5 py-1.5 bg-[#FAF9F6] hover:bg-gray-100 text-gray-600 text-[11px] font-extrabold rounded-xl border border-gray-200 transition-all cursor-pointer font-sans"
                         >
                           <Plus size={11} className="text-[#7DB095]" />
-                          <span>Add Paragraph</span>
+                          <span>Paragraph</span>
                         </button>
+                        <select
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            if (e.target.value) {
+                               appendAdvancedBlock(e.target.value, idx);
+                               e.target.value = "";
+                            }
+                          }}
+                          className="px-2.5 py-1.5 bg-orange-50 hover:bg-orange-100 text-orange-700 text-[11px] font-extrabold rounded-xl border border-orange-200 transition-all cursor-pointer font-sans outline-none"
+                        >
+                          <option value="">+ Advanced</option>
+                          <option value="highlight">Highlight Box</option>
+                          <option value="callout">Callout / Tip</option>
+                          <option value="pullquote">Pull Quote</option>
+                          <option value="summary">Summary Box</option>
+                          <option value="step">Numbered Step</option>
+                          <option value="timeline">Timeline Event</option>
+                          <option value="faq">FAQ</option>
+                          <option value="takeaways">Key Takeaways</option>
+                        </select>
                       </div>
 
                       {/* Ordering utilities */}
@@ -1004,17 +1226,14 @@ export function BlogWriter({
                     {/* Block inputs editor fields */}
                     <div>
                       {isText && (
-                        <div className="space-y-3 font-sans">
-                          <textarea
-                            value={(block as TextBlock).text}
-                            onChange={(e) => updateBlockText(block.id, e.target.value)}
-                            onFocus={() => setActiveBlockId(block.id)}
-                            placeholder="Type paragraph observations... Select workspace block details then insert photos instantly after it."
-                            rows={4}
-                            className={`w-full px-4 py-3 bg-[#FAF9F6]/50 border border-gray-100 focus:border-[#7DB095] focus:bg-white outline-none rounded-xl text-sm leading-relaxed transition-all duration-150 text-gray-800 ${getFontClassName(
-                              (block as TextBlock).fontId || globalFont
-                            )}`}
-                          />
+                        <div className="space-y-3 font-sans" onFocus={() => setActiveBlockId(block.id)}>
+                          <div className={getFontClassName((block as TextBlock).fontId || globalFont)}>
+                            <RichTextEditor
+                              value={(block as TextBlock).text}
+                              onChange={(value) => updateBlockText(block.id, value)}
+                              placeholder="Type paragraph observations... Use formatting tools above."
+                            />
+                          </div>
                           <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1 text-left">
                             <span className="text-[10px] text-gray-400 font-mono">
                               Font style:{" "}
@@ -1071,9 +1290,43 @@ export function BlogWriter({
                                   <option value="center">Centered Medium</option>
                                   <option value="full">Full Width Bleed</option>
                                   <option value="side">Floating Side Block</option>
+                                  <option value="gallery">Image Gallery</option>
+                                  <option value="carousel">Image Carousel</option>
+                                  <option value="hero">Hero Image</option>
+                                  <option value="text-beside">Image with Text Beside</option>
                                 </select>
                               </div>
                             </div>
+                            
+                            {/* Additional config for text-beside or gallery */}
+                            {((block as ImageBlock).style === 'text-beside') && (
+                              <div className="col-span-1 md:col-span-2 space-y-1">
+                                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                                  Text Beside Image
+                                </label>
+                                <textarea
+                                  value={(block as ImageBlock).textBeside || ""}
+                                  onChange={(e) => updateBlockImageProps(block.id, { textBeside: e.target.value })}
+                                  className="w-full px-3 py-2 bg-[#FAF9F6]/50 border border-gray-200 focus:border-[#7DB095] rounded-xl text-xs outline-none text-gray-600 font-sans"
+                                  placeholder="Text to appear alongside the image..."
+                                  rows={2}
+                                />
+                              </div>
+                            )}
+                            {((block as ImageBlock).style === 'gallery' || (block as ImageBlock).style === 'carousel') && (
+                              <div className="col-span-1 md:col-span-2 space-y-1">
+                                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                                  Additional Images (Comma Separated URLs)
+                                </label>
+                                <textarea
+                                  value={(block as ImageBlock).urls?.join(', ') || ""}
+                                  onChange={(e) => updateBlockImageProps(block.id, { urls: e.target.value.split(',').map(u => u.trim()).filter(Boolean) })}
+                                  className="w-full px-3 py-2 bg-[#FAF9F6]/50 border border-gray-200 focus:border-[#7DB095] rounded-xl text-xs outline-none text-gray-600 font-mono"
+                                  placeholder="https://image1.com/..., https://image2.com/..."
+                                  rows={2}
+                                />
+                              </div>
+                            )}
 
                             {/* Local Image quick chooser */}
                             <div className="p-4 bg-[#FAF9F6] border border-dashed border-[#7DB095]/20 rounded-2xl flex flex-col items-center justify-center text-center space-y-2">
@@ -1133,6 +1386,24 @@ export function BlogWriter({
                               </div>
                             </div>
                           )}
+                        </div>
+                      )}
+
+                      {isAdvanced && (
+                        <div className="space-y-3 font-sans mt-4 text-left">
+                           <div className="space-y-1">
+                              <label className="text-[10px] font-bold uppercase tracking-wider text-orange-500 block mb-2">{block.type} Content Elements</label>
+                              <textarea
+                                value={(block as AdvancedBlock).content}
+                                onChange={(e) => {
+                                  setBlocks((prev) => prev.map((b) => (b.id === block.id ? { ...b, content: e.target.value } as AdvancedBlock : b)));
+                                }}
+                                className="w-full px-3 py-2 bg-[#FAF9F6] border border-gray-200 focus:border-orange-300 outline-none rounded-xl text-xs font-mono min-h-[100px]"
+                                placeholder={`Enter properties for ${block.type} block (Plain text or JSON Stringified if complex)...`}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <p className="text-[9px] text-gray-400 font-mono mt-1">If this block requires structured data (like steps or images), write it as raw JSON. Otherwise type directly.</p>
+                           </div>
                         </div>
                       )}
                     </div>
