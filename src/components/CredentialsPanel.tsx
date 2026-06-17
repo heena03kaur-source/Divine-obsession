@@ -124,7 +124,7 @@ export function CredentialsPanel({ token, onSuccess, onCancel }: CredentialsPane
             New Administrator Email
           </label>
           <input
-            type="email"
+            type="text"
             required
             value={emailInput}
             onChange={(e) => setEmailInput(e.target.value)}

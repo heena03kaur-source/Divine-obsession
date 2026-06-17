@@ -1130,7 +1130,7 @@ export function AdminDashboard({
                   New Administrator Email
                 </label>
                 <input
-                  type="email"
+                  type="text"
                   required
                   value={settingsEmail}
                   onChange={(e) => setSettingsEmail(e.target.value)}
