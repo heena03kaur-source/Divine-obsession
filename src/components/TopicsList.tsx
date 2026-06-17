@@ -116,7 +116,7 @@ export function TopicsList({ posts, onSelectPost }: TopicsListProps) {
                   ? "bg-[#7DB095] text-white shadow-sm font-bold"
                   : "bg-white border border-[#7DB095]/20 text-[#7DB095] hover:bg-[#7DB095]/5"
               }`}
-              id={`pill-topic-${topic.name.replace(/\s+/g, "-")}`}
+              id={`pill-topic-${topic.name.replace(/[^a-zA-Z0-9-]/g, "-")}`}
             >
               <Hash size={10} />
               <span>{topic.name}</span>

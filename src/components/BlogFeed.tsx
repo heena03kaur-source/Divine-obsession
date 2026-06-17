@@ -285,7 +285,7 @@ export function BlogFeed({
                   key={subj.name}
                   onClick={() => setActiveSubject(subj.name)}
                   className="group bg-white hover:bg-[#FAF9F6]/40 border border-gray-100 hover:border-[#7DB095]/30 rounded-3xl p-6 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer text-left flex flex-col justify-between font-sans"
-                  id={`subject-card-${subj.name.replace(/\s+/g, "-")}`}
+                  id={`subject-card-${subj.name.replace(/[^a-zA-Z0-9-]/g, "-")}`}
                 >
                   <div className="space-y-4">
                     <div className="flex items-center justify-between gap-2 border-b border-gray-50 pb-3">
@@ -582,7 +582,7 @@ export function BlogFeed({
                 setActiveSubject(null);
               }}
               className="group cursor-pointer bg-white hover:bg-gradient-to-b hover:from-white hover:to-[#7DB095]/5 border border-gray-100 hover:border-[#7DB095]/30 rounded-3xl p-6 md:p-8 flex flex-col justify-between shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-y-1 text-left animate-in fade-in zoom-in-95 duration-200"
-              id={`card-learning-custom-${cat.replace(/\s+/g, "-").toLowerCase()}`}
+              id={`card-learning-custom-${cat.replace(/[^a-zA-Z0-9-]/g, "-").toLowerCase()}`}
             >
               <div className="space-y-4">
                 <div className="w-11 h-11 bg-teal-50 text-teal-700 border border-teal-100 rounded-2xl flex items-center justify-center">
