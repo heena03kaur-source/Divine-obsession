@@ -53,8 +53,8 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModalProps) {
     const apiPath = tab === "login" ? "/api/login" : "/api/register";
     
     const bodyPayload = tab === "login"
-      ? { email: email.trim().toLowerCase(), password }
-      : { email: email.trim().toLowerCase(), password, name: name.trim() || email.split("@")[0] };
+      ? { email: email.trim().toLowerCase(), password: password.trim() }
+      : { email: email.trim().toLowerCase(), password: password.trim(), name: name.trim() || email.split("@")[0] };
 
     try {
       const response = await fetch(apiPath, {
@@ -199,14 +199,9 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModalProps) {
             )}
 
             <div className="space-y-1.5 animate-in fade-in duration-200">
-              <div className="flex justify-between items-end">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-[#7DB095] font-sans">
-                  Email Address
-                </label>
-                {tab === "login" && (
-                  <span className="text-[9px] text-[#7DB095] italic">Admin: heena03kaur@gmail.com</span>
-                )}
-              </div>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-[#7DB095] font-sans">
+                Email Address
+              </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-gray-400">
                   <Mail size={15} />
@@ -224,14 +219,9 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModalProps) {
             </div>
 
             <div className="space-y-1.5">
-              <div className="flex justify-between items-end">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-[#7DB095] font-sans">
-                  Password
-                </label>
-                {tab === "login" && (
-                  <span className="text-[9px] text-[#7DB095] italic">Pass: Love_yourself03!</span>
-                )}
-              </div>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-[#7DB095] font-sans">
+                Password
+              </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-gray-400">
                   <Lock size={15} />
@@ -264,46 +254,6 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModalProps) {
               )}
             </button>
           </form>
-
-          <div className="relative flex py-2 items-center text-xs text-gray-400">
-            <div className="flex-grow border-t border-gray-100"></div>
-            <span className="flex-shrink mx-3 text-[10px] uppercase tracking-widest text-[#7DB095]/60">
-              Or alternative
-            </span>
-            <div className="flex-grow border-t border-gray-100"></div>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleGoogleLogin}
-            disabled={loading || oauthLoading}
-            className="w-full py-2.5 bg-white border border-gray-200 hover:border-gray-300 rounded-xl flex items-center justify-center gap-2.5 text-xs text-gray-700 font-medium transition-all shadow-sm cursor-pointer hover:bg-gray-50 focus:outline-none"
-            id="btn-google-login"
-          >
-            {oauthLoading ? (
-              <Loader2 size={14} className="animate-spin text-gray-400" />
-            ) : (
-              <svg className="w-4 h-4" viewBox="0 0 24 24">
-                <path
-                  fill="#EA4335"
-                  d="M5.266 9.765A7.077 7.077 0 0 1 12 4.909c1.69 0 3.218.6 4.418 1.582l3.51-3.51C17.643.95 14.996 0 12 0 7.354 0 3.307 2.658 1.277 6.545z"
-                />
-                <path
-                  fill="#4285F4"
-                  d="M24 12.273c0-.818-.082-1.609-.218-2.386H12v4.545h6.727A5.766 5.766 0 0 1 16.2 18.25v3.818h3.818c2.236-2.064 3.982-5.114 3.982-9.795z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.266 14.235 1.277 17.3c2.03 3.887 6.077 6.545 10.723 6.545 3 0 5.618-.995 7.509-2.705l-3.818-2.955c-1.023.682-2.332 1.109-3.691 1.109a7.077 7.077 0 0 1-6.734-4.859z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 4.909c1.69 0 3.23.605 4.43 1.595l3.5-3.5C17.65 1.16 15 .2 12 .2 7.35 1.16 3.307 3.818 1.277 7.7l3.989 3.091A7.08 7.08 0 0 1 12 4.909"
-                />
-              </svg>
-            )}
-            <span>Continue with Google</span>
-          </button>
         </div>
       </div>
     </div>
