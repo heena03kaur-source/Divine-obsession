@@ -62,7 +62,7 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModalProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(bodyPayload),
       });
-      const data = await response.json();
+      const data = await response.json().catch(() => ({ error: "Server response was not valid JSON." }));
       if (!response.ok) {
         throw new Error(
           data.error || "Authentication failed. Please verify your credentials."

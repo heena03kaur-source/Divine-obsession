@@ -98,6 +98,7 @@ export function CredentialsPanel({ token, onSuccess, onCancel }: CredentialsPane
         onSubmit={handleSubmit}
         className="space-y-6 bg-white border border-[#7DB095]/15 rounded-2xl p-6 md:p-8"
         id="credentials-form"
+        noValidate
       >
         {errorAlert && (
           <div

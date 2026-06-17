@@ -740,7 +740,7 @@ export function BlogWriter({
       </div>
 
       {/* Editor Forms */}
-      <form onSubmit={handleSubmit} className="space-y-6" id="write-blog-form">
+      <form onSubmit={handleSubmit} className="space-y-6" id="write-blog-form" noValidate>
         {/* Draft Loaded Notice */}
         {hasUnsavedDraft && (
           <div
