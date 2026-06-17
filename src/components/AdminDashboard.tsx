@@ -1110,7 +1110,7 @@ export function AdminDashboard({
               </p>
             </div>
 
-            <form onSubmit={handleSettingsSubmit} className="space-y-6 bg-white border border-[#7DB095]/15 rounded-2xl p-6" id="dashboard-credentials-form">
+            <form onSubmit={handleSettingsSubmit} className="space-y-6 bg-white border border-[#7DB095]/15 rounded-2xl p-6" id="dashboard-credentials-form" noValidate>
               {settingsError && (
                 <div className="px-4 py-3 bg-red-50 border border-red-200/50 rounded-lg text-red-600 flex items-start gap-2.5 text-xs font-sans">
                   <AlertTriangle size={18} className="shrink-0 mt-0.5" />

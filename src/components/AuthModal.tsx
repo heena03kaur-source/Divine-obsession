@@ -175,7 +175,7 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModalProps) {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4" id="login-form">
+          <form onSubmit={handleSubmit} className="space-y-4" id="login-form" noValidate>
             {tab === "register" && (
               <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
                 <label className="text-[10px] font-bold uppercase tracking-wider text-[#7DB095] font-sans">
