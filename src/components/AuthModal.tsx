@@ -23,14 +23,7 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModalProps) {
   useEffect(() => {
     const handleOauthMessage = (e: MessageEvent) => {
       const origin = e.origin;
-      if (
-        !(
-          !origin.endsWith(".run.app") &&
-          !origin.includes("localhost") &&
-          !origin.includes("0.0.0.0")
-        ) &&
-        e.data?.type === "OAUTH_AUTH_SUCCESS"
-      ) {
+      if (e.data?.type === "OAUTH_AUTH_SUCCESS") {
         const { token, email: userEmail, isAdmin } = e.data;
         onLoginSuccess(token, userEmail, !!isAdmin);
         setEmail("");
