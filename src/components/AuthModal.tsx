@@ -111,6 +111,11 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, closable = true }: 
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
       id="login-modal-overlay"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && closable) {
+          onClose();
+        }
+      }}
     >
       <div
         className="w-full max-w-sm bg-[#FAF9F6] border border-[#7DB095]/30 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"

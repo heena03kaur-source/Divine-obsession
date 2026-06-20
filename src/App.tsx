@@ -117,7 +117,6 @@ export default function App() {
 
   useEffect(() => {
     if (!token && ["write", "settings-edit", "admin-dashboard"].includes(currentTab)) {
-      setIsAuthOpen(true);
       setCurrentTab("blogs");
     } else if (!isAdmin && ["write", "settings-edit", "admin-dashboard"].includes(currentTab)) {
       setCurrentTab("blogs");
@@ -474,11 +473,9 @@ export default function App() {
 
       <AuthModal
         isOpen={isAuthOpen}
-        onClose={() => {
-          if (token) setIsAuthOpen(false);
-        }}
+        onClose={() => setIsAuthOpen(false)}
         onLoginSuccess={handleLoginSuccess}
-        closable={!!token}
+        closable={true}
       />
 
       {/* Structured elegant decoration footer */}
