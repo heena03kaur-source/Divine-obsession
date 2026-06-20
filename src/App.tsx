@@ -32,7 +32,7 @@ export default function App() {
     () => localStorage.getItem("sage_blog_is_admin") === "true"
   );
   
-  const [isAuthOpen, setIsAuthOpen] = useState<boolean>(!initialToken);
+  const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
 
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -116,11 +116,9 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (!token) {
+    if (!token && ["write", "settings-edit", "admin-dashboard"].includes(currentTab)) {
       setIsAuthOpen(true);
-      if (["write", "settings-edit", "admin-dashboard"].includes(currentTab)) {
-        setCurrentTab("blogs");
-      }
+      setCurrentTab("blogs");
     } else if (!isAdmin && ["write", "settings-edit", "admin-dashboard"].includes(currentTab)) {
       setCurrentTab("blogs");
     }
