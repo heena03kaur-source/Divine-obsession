@@ -1,3 +1,4 @@
+import { safeLocalStorage, safeSessionStorage } from "../lib/storage";
 import React, { useState, useEffect, useRef } from "react";
 import {
   ArrowLeft,
@@ -72,7 +73,7 @@ export function BlogWriter({
   // Initial parsed active write session if present
   const restoredSession = (() => {
     try {
-      const saved = localStorage.getItem("sage_active_write_session");
+      const saved = safeLocalStorage.getItem("sage_active_write_session");
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed === "object") return parsed;
@@ -258,7 +259,7 @@ export function BlogWriter({
           blocks,
           updatedAt: Date.now(),
         };
-        localStorage.setItem("sage_active_write_session", JSON.stringify(draftObj));
+        safeLocalStorage.setItem("sage_active_write_session", JSON.stringify(draftObj));
         const timeStr = new Date().toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
@@ -284,13 +285,13 @@ export function BlogWriter({
             blocks: textOnlyBlocks,
             updatedAt: Date.now(),
           };
-          localStorage.setItem("sage_active_write_session", JSON.stringify(fallbackDraft));
+          safeLocalStorage.setItem("sage_active_write_session", JSON.stringify(fallbackDraft));
           setAutosaveTime("Saved Text Only (Quota Limit)");
           setHasUnsavedDraft(true);
         } catch {}
       }
     } else {
-      localStorage.removeItem("sage_active_write_session");
+      safeLocalStorage.removeItem("sage_active_write_session");
       setAutosaveTime(null);
       setHasUnsavedDraft(false);
     }
@@ -494,7 +495,7 @@ export function BlogWriter({
   };
 
   const handleDiscardDraft = () => {
-    localStorage.removeItem("sage_active_write_session");
+    safeLocalStorage.removeItem("sage_active_write_session");
     setHasUnsavedDraft(false);
     setAutosaveTime(null);
 
@@ -619,17 +620,17 @@ export function BlogWriter({
       // Sync/Store backup representation locally to guarantee persistence across server restates and code edits
       if (resData.post) {
         try {
-          const backupRaw = localStorage.getItem("sage_published_backup");
+          const backupRaw = safeLocalStorage.getItem("sage_published_backup");
           const backups = backupRaw ? JSON.parse(backupRaw) : {};
           backups[resData.post.id] = resData.post;
-          localStorage.setItem("sage_published_backup", JSON.stringify(backups));
+          safeLocalStorage.setItem("sage_published_backup", JSON.stringify(backups));
         } catch (e) {
           console.error("Local backup tracking write failed:", e);
         }
       }
 
       // Cleanup Draft on success
-      localStorage.removeItem("sage_active_write_session");
+      safeLocalStorage.removeItem("sage_active_write_session");
       onPublishSuccess();
     } catch (err: any) {
       setErrorAlert(err.message || "Something went wrong while publishing.");

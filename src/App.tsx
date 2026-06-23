@@ -1,3 +1,4 @@
+import { safeLocalStorage, safeSessionStorage } from "./lib/storage";
 import React, { useState, useEffect, useMemo } from "react";
 import { Navbar } from "./components/Navbar";
 import { BlogFeed } from "./components/BlogFeed";
@@ -8,6 +9,7 @@ import { CredentialsPanel } from "./components/CredentialsPanel";
 import { AdminDashboard } from "./components/AdminDashboard";
 import { NotFound } from "./components/NotFound";
 import { AuthModal } from "./components/AuthModal";
+import { ResetPasswordModal } from "./components/ResetPasswordModal";
 import { ReadLaterList } from "./components/ReadLaterList";
 import { Post } from "./types";
 import { Award, BookOpen, Heart } from "lucide-react";
@@ -25,14 +27,31 @@ export default function App() {
   
   const [openSettingsMenu, setOpenSettingsMenu] = useState<boolean>(false);
 
-  const initialToken = localStorage.getItem("sage_blog_token");
+  const initialToken = safeLocalStorage.getItem("sage_blog_token");
   const [token, setToken] = useState<string | null>(initialToken);
-  const [userEmail, setUserEmail] = useState<string | null>(() => localStorage.getItem("sage_blog_email"));
+  const [userEmail, setUserEmail] = useState<string | null>(() => safeLocalStorage.getItem("sage_blog_email"));
   const [isAdmin, setIsAdmin] = useState<boolean>(
-    () => localStorage.getItem("sage_blog_is_admin") === "true"
+    () => safeLocalStorage.getItem("sage_blog_is_admin") === "true"
   );
   
   const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
+  const [resetTokenInfo, setResetTokenInfo] = useState<{ token: string, email: string } | null>(null);
+
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("reset") === "true" && params.get("token") && params.get("email")) {
+        setResetTokenInfo({
+          token: params.get("token")!,
+          email: params.get("email")!
+        });
+        // Clean up URL
+        window.history.replaceState({}, document.title || "", window.location.pathname);
+      }
+    } catch (e) {
+      console.warn("Error modifying history:", e);
+    }
+  }, []);
 
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -40,7 +59,7 @@ export default function App() {
 
   const [savedPostIds, setSavedPostIds] = useState<string[]>(() => {
     try {
-      const stored = localStorage.getItem("sage_read_list");
+      const stored = safeLocalStorage.getItem("sage_read_list");
       return stored ? JSON.parse(stored) : [];
     } catch {
       return [];
@@ -53,7 +72,7 @@ export default function App() {
       const next = prev.includes(idStr)
         ? prev.filter((id) => id !== idStr)
         : [...prev, idStr];
-      localStorage.setItem("sage_read_list", JSON.stringify(next));
+      safeLocalStorage.setItem("sage_read_list", JSON.stringify(next));
       return next;
     });
   };
@@ -62,11 +81,11 @@ export default function App() {
   const syncLocalBackupToBackend = async (fetchedPosts: Post[]) => {
     if (!token || !isAdmin) return;
     try {
-      const backupRaw = localStorage.getItem("sage_published_backup");
+      const backupRaw = safeLocalStorage.getItem("sage_published_backup");
       if (!backupRaw) return;
 
       const backup = JSON.parse(backupRaw);
-      const deletedRaw = localStorage.getItem("sage_deleted_history");
+      const deletedRaw = safeLocalStorage.getItem("sage_deleted_history");
       const deletedList: string[] = deletedRaw ? JSON.parse(deletedRaw) : [];
 
       const fetchedIds = new Set(fetchedPosts.map((p) => String(p.id)));
@@ -131,7 +150,7 @@ export default function App() {
       }).then(res => {
         if (!res.ok) {
           setIsAdmin(false);
-          localStorage.setItem("sage_blog_is_admin", "false");
+          safeLocalStorage.setItem("sage_blog_is_admin", "false");
           if (["write", "settings-edit", "admin-dashboard"].includes(currentTab)) {
             setCurrentTab("blogs");
           }
@@ -153,8 +172,8 @@ export default function App() {
       // Triple check and merge with client-side backups
       let finalPosts = [...data];
       try {
-        const backupRaw = localStorage.getItem("sage_published_backup");
-        const deletedRaw = localStorage.getItem("sage_deleted_history");
+        const backupRaw = safeLocalStorage.getItem("sage_published_backup");
+        const deletedRaw = safeLocalStorage.getItem("sage_deleted_history");
         const deletedList: string[] = deletedRaw ? JSON.parse(deletedRaw) : [];
 
         if (backupRaw) {
@@ -192,10 +211,10 @@ export default function App() {
 
   // Periodic Analytics Ping Loop
   useEffect(() => {
-    let session_id = sessionStorage.getItem("sage_session_id");
+    let session_id = safeSessionStorage.getItem("sage_session_id");
     if (!session_id) {
       session_id = "s-" + Math.random().toString(36).substring(2, 9);
-      sessionStorage.setItem("sage_session_id", session_id);
+      safeSessionStorage.setItem("sage_session_id", session_id);
     }
 
     const device_type = window.innerWidth < 768 ? "Mobile" : "Desktop";
@@ -234,9 +253,9 @@ export default function App() {
 
   // Auth callbacks
   const handleLoginSuccess = (jwt: string, email: string, adminStatus: boolean) => {
-    localStorage.setItem("sage_blog_token", jwt);
-    localStorage.setItem("sage_blog_email", email);
-    localStorage.setItem("sage_blog_is_admin", String(adminStatus));
+    safeLocalStorage.setItem("sage_blog_token", jwt);
+    safeLocalStorage.setItem("sage_blog_email", email);
+    safeLocalStorage.setItem("sage_blog_is_admin", String(adminStatus));
     
     setToken(jwt);
     setUserEmail(email);
@@ -249,9 +268,9 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("sage_blog_token");
-    localStorage.removeItem("sage_blog_email");
-    localStorage.removeItem("sage_blog_is_admin");
+    safeLocalStorage.removeItem("sage_blog_token");
+    safeLocalStorage.removeItem("sage_blog_email");
+    safeLocalStorage.removeItem("sage_blog_is_admin");
     
     setToken(null);
     setUserEmail(null);
@@ -441,7 +460,7 @@ export default function App() {
         setCurrentTab={(tab: string, subTab?: string, resetPostToEdit: boolean = false) => {
           if (resetPostToEdit) {
             setPostToEdit(null);
-            localStorage.removeItem("sage_active_write_session");
+            safeLocalStorage.removeItem("sage_active_write_session");
           }
           if (tab === "blogs") {
             setActiveCategory(null);
@@ -477,6 +496,14 @@ export default function App() {
         onLoginSuccess={handleLoginSuccess}
         closable={true}
       />
+
+      {resetTokenInfo && (
+        <ResetPasswordModal
+          email={resetTokenInfo.email}
+          token={resetTokenInfo.token}
+          onClose={() => setResetTokenInfo(null)}
+        />
+      )}
 
       {/* Structured elegant decoration footer */}
       <footer className="mt-auto border-t border-[#7DB095]/10 bg-white py-6" id="footer-decor">

@@ -1,3 +1,4 @@
+import { safeLocalStorage, safeSessionStorage } from "../lib/storage";
 import React, { useState, useEffect } from "react";
 import {
   ArrowLeft,
@@ -182,17 +183,17 @@ export function AdminDashboard({
       
       // Update local deletion logs
       try {
-        const deletedRaw = localStorage.getItem("sage_deleted_history");
+        const deletedRaw = safeLocalStorage.getItem("sage_deleted_history");
         const deletedList = deletedRaw ? JSON.parse(deletedRaw) : [];
         if (!deletedList.includes(String(id))) {
           deletedList.push(String(id));
-          localStorage.setItem("sage_deleted_history", JSON.stringify(deletedList));
+          safeLocalStorage.setItem("sage_deleted_history", JSON.stringify(deletedList));
         }
-        const backupRaw = localStorage.getItem("sage_published_backup");
+        const backupRaw = safeLocalStorage.getItem("sage_published_backup");
         if (backupRaw) {
           const backups = JSON.parse(backupRaw);
           delete backups[id];
-          localStorage.setItem("sage_published_backup", JSON.stringify(backups));
+          safeLocalStorage.setItem("sage_published_backup", JSON.stringify(backups));
         }
       } catch (e) {
         console.error("Local storage delete log failed:", e);
@@ -232,17 +233,17 @@ export function AdminDashboard({
 
       // Update local deletion logs on restore
       try {
-        const deletedRaw = localStorage.getItem("sage_deleted_history");
+        const deletedRaw = safeLocalStorage.getItem("sage_deleted_history");
         if (deletedRaw) {
           const deletedList = JSON.parse(deletedRaw);
           const filteredList = deletedList.filter((d: string) => d !== String(id));
-          localStorage.setItem("sage_deleted_history", JSON.stringify(filteredList));
+          safeLocalStorage.setItem("sage_deleted_history", JSON.stringify(filteredList));
         }
         if (data.post) {
-          const backupRaw = localStorage.getItem("sage_published_backup");
+          const backupRaw = safeLocalStorage.getItem("sage_published_backup");
           const backups = backupRaw ? JSON.parse(backupRaw) : {};
           backups[data.post.id] = data.post;
-          localStorage.setItem("sage_published_backup", JSON.stringify(backups));
+          safeLocalStorage.setItem("sage_published_backup", JSON.stringify(backups));
         }
       } catch (e) {
         console.error("Local storage restore log failed:", e);
@@ -274,17 +275,17 @@ export function AdminDashboard({
 
       // Update local deletion logs for permanent purge
       try {
-        const deletedRaw = localStorage.getItem("sage_deleted_history");
+        const deletedRaw = safeLocalStorage.getItem("sage_deleted_history");
         const deletedList = deletedRaw ? JSON.parse(deletedRaw) : [];
         if (!deletedList.includes(String(id))) {
           deletedList.push(String(id));
-          localStorage.setItem("sage_deleted_history", JSON.stringify(deletedList));
+          safeLocalStorage.setItem("sage_deleted_history", JSON.stringify(deletedList));
         }
-        const backupRaw = localStorage.getItem("sage_published_backup");
+        const backupRaw = safeLocalStorage.getItem("sage_published_backup");
         if (backupRaw) {
           const backups = JSON.parse(backupRaw);
           delete backups[id];
-          localStorage.setItem("sage_published_backup", JSON.stringify(backups));
+          safeLocalStorage.setItem("sage_published_backup", JSON.stringify(backups));
         }
       } catch (e) {
         console.error("Local storage purge log failed:", e);

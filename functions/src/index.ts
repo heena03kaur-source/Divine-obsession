@@ -1,9 +1,13 @@
+import "dotenv/config";
 import { onRequest } from "firebase-functions/v2/https";
-import * as express from "express";
-import * as cors from "cors";
+import express from "express";
+const cors = require("cors");
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
+import bcrypt from "bcryptjs";
+import crypto from "crypto";
+import nodemailer from "nodemailer";
 
 export interface Post {
   id: string;
@@ -142,6 +146,7 @@ let db: LocalDB = {
   sessions: [],
 };
 
+let resetTokens: Record<string, { token: string, expiry: number }> = {};
 let dbPasswords: Record<string, string> = {
   [DEFAULT_OWNER_EMAIL]: DEFAULT_OWNER_PASS,
 };
@@ -154,8 +159,20 @@ function loadDB() {
       if (diskData.posts) db.posts = diskData.posts;
       if (diskData.users) db.users = diskData.users;
       if (diskData.sessions) db.sessions = diskData.sessions;
+      if (diskData.resetTokens) resetTokens = diskData.resetTokens;
       if (diskData.passwords) {
         dbPasswords = { ...dbPasswords, ...diskData.passwords };
+      }
+      
+      let hashedAny = false;
+      Object.keys(dbPasswords).forEach(email => {
+        if (!dbPasswords[email].startsWith("$2")) {
+          dbPasswords[email] = bcrypt.hashSync(dbPasswords[email], 10);
+          hashedAny = true;
+        }
+      });
+      if (hashedAny) {
+        saveDB();
       }
     } else {
       saveDB();
@@ -172,6 +189,7 @@ function saveDB() {
       users: db.users,
       sessions: db.sessions,
       passwords: dbPasswords,
+      resetTokens,
     };
     fs.writeFileSync(DB_FILE, JSON.stringify(payload, null, 2), "utf-8");
   } catch (err) {
@@ -181,7 +199,7 @@ function saveDB() {
 
 loadDB();
 
-const app = express();
+export const app = express();
 app.use(cors({ origin: true }));
 app.use(express.json());
 
@@ -247,14 +265,14 @@ app.post("/api/posts", authenticateToken, requireAdmin, (req, res) => {
   }
 
   const newPost: Post = {
-    id: id ? String(id) : \`post_\${Date.now()}\`,
+    id: id ? String(id) : `post_${Date.now()}`,
     title: title.trim(),
     topic: (topic || subject || "General").trim(),
     category: category || "Self",
     subject: (subject || topic || "General").trim(),
     featuredImage: featuredImage || "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&q=80&w=800",
     content,
-    readTime: \`\${Math.max(2, Math.ceil(content.length / 800))} min read\`,
+    readTime: `${Math.max(2, Math.ceil(content.length / 800))} min read`,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     views: 0,
@@ -383,12 +401,12 @@ app.post("/api/login", (req, res) => {
   }
 
   const savedPass = dbPasswords[normalizedEmail];
-  if (savedPass !== password) {
+  if (!savedPass || !bcrypt.compareSync(password, savedPass)) {
     res.status(400).json({ error: "Invalid secure password. Try again." });
     return;
   }
 
-  const token = \`token-\${userObj.email}-\${Date.now()}\`;
+  const token = `token-${userObj.email}-${Date.now()}`;
   res.json({
     token,
     email: userObj.email,
@@ -424,10 +442,10 @@ app.post("/api/register", (req, res) => {
   };
 
   db.users.push(newUser);
-  dbPasswords[normalizedEmail] = password;
+  dbPasswords[normalizedEmail] = bcrypt.hashSync(password, 10);
   saveDB();
 
-  const token = \`token-\${newUser.email}-\${Date.now()}\`;
+  const token = `token-${newUser.email}-${Date.now()}`;
   res.status(201).json({
     token,
     email: newUser.email,
@@ -460,7 +478,7 @@ app.put("/api/credentials", authenticateToken, requireAdmin, (req, res) => {
 
   adminUser.email = normalizedNewEmail;
   delete dbPasswords[oldEmail];
-  dbPasswords[normalizedNewEmail] = newPassword;
+  dbPasswords[normalizedNewEmail] = bcrypt.hashSync(newPassword, 10);
 
   saveDB();
 
@@ -549,44 +567,151 @@ app.get("/api/admin/metrics", authenticateToken, requireAdmin, (req, res) => {
   res.json(payloadMetrics);
 });
 
-// 13. GET /api/auth/google/url
-app.get("/api/auth/google/url", (req, res) => {
-  res.json({ url: "/api/auth/google/callback" });
+// MAIL SYSTEM
+const mailTransporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.MAIL_USER,
+    pass: process.env.MAIL_PASS
+  }
 });
 
-app.get("/api/auth/google/callback", (req, res) => {
-  const mockEmail = "visitor@example.com";
-  res.send(\`
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>Google Sign-In Complete</title>
-        <style>
-          body { font-family: -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; background-color: #FAF9F6; margin: 0; color: #333; }
-          .card { padding: 2rem; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); text-align: center; }
-        </style>
-      </head>
-      <body>
-        <div class="card">
-          <h2>Authorized successfully</h2>
-          <p>Syncing your Google credentials... Please wait.</p>
+app.get("/api/env-debug", (req, res) => {
+  res.json({
+    MAIL_USER: process.env.MAIL_USER || "MISSING",
+    MAIL_PASS: process.env.MAIL_PASS ? "SET" : "MISSING",
+  });
+});
+
+app.post("/api/forgot-password", async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    res.status(400).json({ error: "Email address is required." });
+    return;
+  }
+  loadDB();
+  const normalizedEmail = email.trim().toLowerCase();
+  const userObj = db.users.find((u) => u.email.toLowerCase() === normalizedEmail);
+
+  if (!userObj) {
+    res.json({ success: true, message: "If that email exists, a reset link will be sent." });
+    return;
+  }
+
+  const token = crypto.randomBytes(32).toString("hex");
+  const expiry = Date.now() + 3600000; // 1 hour
+  resetTokens[normalizedEmail] = { token, expiry };
+  saveDB();
+
+  const host = req.headers["x-forwarded-host"] || req.get("host") || "localhost:3000";
+  const proto = req.headers["x-forwarded-proto"] || "http";
+  const resetLink = process.env.APP_URL 
+    ? `${process.env.APP_URL}?reset=true&token=${token}&email=${encodeURIComponent(normalizedEmail)}`
+    : `${proto}://${host}?reset=true&token=${token}&email=${encodeURIComponent(normalizedEmail)}`;
+
+  try {
+    if (!process.env.MAIL_USER || !process.env.MAIL_PASS) {
+        console.warn("MAIL_USER and MAIL_PASS are not set. The reset link is: " + resetLink);
+        res.json({ 
+          success: true, 
+          message: "Secrets missing. If you are the developer, check server logs for the link. Otherwise, please configure MAIL_USER and MAIL_PASS." 
+        });
+    } else {
+        await mailTransporter.sendMail({
+          from: `"Divine Obsession" <${process.env.MAIL_USER}>`,
+          to: normalizedEmail,
+          subject: "Divine Obsession Password Reset",
+          text: `Some obsessions are worth protecting. This is your reminder to protect yours.\n\nWe received a request to reset the password associated with your Divine Obsession account.\n\nClick the link below to create a new password and regain access to your account:\n${resetLink}\n\nIf you didn't request this reset, you can safely ignore this email.\n\nStay inspired. Stay obsessed.\n\n— Team Divine Obsession`,
+          html: `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Inter:wght@300;400;500;600&display=swap');
+  
+  body { background-color: #FAF9F6; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
+  .wrapper { background-color: #FAF9F6; padding: 60px 20px; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+  .container { max-width: 520px; margin: 0 auto; background: #ffffff; padding: 0; text-align: center; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.04); border: 1px solid rgba(125, 176, 149, 0.15); }
+  .top-accent { height: 4px; background-color: #7DB095; width: 100%; }
+  .header { padding: 48px 40px 0 40px; }
+  .logo { font-size: 20px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: #2D3436; font-family: 'Playfair Display', Georgia, serif; }
+  .divider { width: 32px; height: 2px; background-color: #7DB095; margin: 24px auto 32px auto; opacity: 0.8; }
+  .content-body { padding: 0 40px 48px 40px; text-align: left; }
+  .headline { font-size: 22px; font-family: 'Playfair Display', Georgia, serif; color: #2D3436; font-weight: 600; line-height: 1.5; margin-bottom: 24px; text-align: center; }
+  .text-content { font-size: 15px; line-height: 1.6; color: #555555; }
+  .text-content p { margin: 0 0 16px 0; }
+  .button-container { margin: 40px 0; text-align: center; }
+  .button { background-color: #7DB095; color: #ffffff !important; text-decoration: none; padding: 16px 36px; font-weight: 500; letter-spacing: 1px; font-size: 14px; display: inline-block; border-radius: 8px; transition: background-color 0.2s ease; }
+  .footer-divider { width: 100%; height: 1px; background-color: rgba(125, 176, 149, 0.15); margin: 32px 0; }
+  .footer { font-size: 13px; color: #888888; text-align: center; line-height: 1.6; }
+  .sign-off { margin-top: 32px; font-size: 16px; font-weight: 600; font-style: italic; color: #2D3436; font-family: 'Playfair Display', Georgia, serif; text-align: center; }
+</style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="container">
+      <div class="top-accent"></div>
+      <div class="header">
+        <div class="logo">DIVINE OBSESSION</div>
+        <div class="divider"></div>
+      </div>
+      <div class="content-body">
+        <div class="headline">Some obsessions are worth protecting. This is your reminder to protect yours.</div>
+        <div class="text-content">
+          <p>We received a request to reset the password associated with your Divine Obsession account.</p>
+          <p>Click the button below to create a new password and regain access to your account.</p>
+          
+          <div class="button-container">
+            <a href="${resetLink}" class="button">Reset Password</a>
+          </div>
+          
+          <div class="footer-divider"></div>
+          
+          <div class="footer">
+            <p>If you didn't request this reset, you can safely ignore this email.</p>
+          </div>
+          <div class="sign-off">Stay inspired. Stay obsessed.<br><br>— Team Divine Obsession</div>
         </div>
-        <script>
-          setTimeout(() => {
-            if (window.opener) {
-              window.opener.postMessage({
-                type: 'OAUTH_AUTH_SUCCESS',
-                token: 'oauth-token-' + '\${mockEmail}' + '-\${Date.now()}',
-                email: '\${mockEmail}',
-                isAdmin: false
-              }, '*');
-            }
-            window.close();
-          }, 800);
-        </script>
-      </body>
-    </html>
-  \`);
+      </div>
+    </div>
+  </div>
+</body>
+</html>`
+        });
+        res.json({ success: true, message: "If that email exists, a reset link will be sent." });
+    }
+  } catch (err: any) {
+    console.error("Failed to send email:", err);
+    res.status(500).json({ error: "Failed to send reset email due to server error. " + (err.message || "") });
+  }
+});
+
+app.post("/api/reset-password", async (req, res) => {
+  const { email, token, newPassword } = req.body;
+  if (!email || !token || !newPassword) {
+    res.status(400).json({ error: "Missing required fields." });
+    return;
+  }
+  loadDB();
+  const normalizedEmail = email.trim().toLowerCase();
+  const tokenRecord = resetTokens[normalizedEmail];
+
+  if (!tokenRecord || tokenRecord.token !== token) {
+    res.status(400).json({ error: "Invalid or expired reset token." });
+    return;
+  }
+
+  if (Date.now() > tokenRecord.expiry) {
+    res.status(400).json({ error: "Reset token has expired." });
+    return;
+  }
+
+  dbPasswords[normalizedEmail] = bcrypt.hashSync(newPassword, 10);
+  delete resetTokens[normalizedEmail];
+  saveDB();
+
+  res.json({ success: true, message: "Password has been successfully reset." });
 });
 
 export const api = onRequest(app);
