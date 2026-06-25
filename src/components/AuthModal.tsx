@@ -77,7 +77,12 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, closable = true }: 
         
         const text = await response.text();
         if (text.startsWith("<!DOCTYPE") || text.includes("<html")) {
-          throw new Error("Cannot send email from GitHub Pages. A backend server is required.");
+          const isStaticHosting = window.location.hostname.includes("github.io");
+          if (isStaticHosting) {
+            throw new Error("Cannot send email from GitHub Pages. A backend server is required.");
+          } else {
+            throw new Error("The backend server returned an HTML page instead of JSON. The server may be restarting or compiling. Please wait 10 seconds and try again.");
+          }
         }
         
         let data;
@@ -123,7 +128,12 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, closable = true }: 
 
       const text = await response.text();
       if (text.startsWith("<!DOCTYPE") || text.includes("<html")) {
-        throw new Error("Cannot authenticate from GitHub Pages. A backend server is required.");
+        const isStaticHosting = window.location.hostname.includes("github.io");
+        if (isStaticHosting) {
+          throw new Error("Cannot authenticate from GitHub Pages. A backend server is required.");
+        } else {
+          throw new Error("The backend server returned an HTML page instead of JSON. The server may be restarting or compiling. Please wait 10 seconds and try again.");
+        }
       }
 
       let data;
