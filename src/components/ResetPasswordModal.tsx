@@ -27,13 +27,23 @@ export function ResetPasswordModal({ email, token, onClose }: ResetProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, token, newPassword: password })
       });
-      const data = await resp.json();
+      
+      const text = await resp.text();
+      if (text.startsWith("<!DOCTYPE") || text.includes("<html")) {
+        throw new Error("Cannot reset password from GitHub Pages. A backend server is required.");
+      }
+      
+      const data = JSON.parse(text);
       if (!resp.ok) {
         throw new Error(data.error || "Failed to reset password.");
       }
       setSuccess("Your password has been reset successfully. You can now close this window and sign in.");
     } catch (err: any) {
-      setError(err.message || "An unexpected error occurred.");
+      if (err.message.includes("pattern") || err.message.includes("network") || err.message.includes("JSON")) {
+        setError("Cannot communicate with backend from static hosting like GitHub Pages.");
+      } else {
+        setError(err.message || "An unexpected error occurred.");
+      }
     } finally {
       setLoading(false);
     }

@@ -8,6 +8,10 @@ import * as path from "path";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
+import jwt from "jsonwebtoken";
+import rateLimit from "express-rate-limit";
+
+const getJwtSecret = () => process.env.JWT_SECRET || "fallback-secret-do-not-use-in-production";
 
 export interface Post {
   id: string;
@@ -40,6 +44,7 @@ export interface User {
   googleAuth: boolean;
   createdAt: string;
   isAdmin?: boolean;
+  verified?: boolean;
 }
 
 export interface Session {
@@ -74,8 +79,8 @@ interface LocalDB {
 
 const DB_FILE = path.join(os.tmpdir(), "db.json");
 
-const DEFAULT_OWNER_EMAIL = "heena03kaur@gmail.com";
-const DEFAULT_OWNER_PASS = "Love_yourself03!";
+const DEFAULT_OWNER_EMAIL = process.env.DEFAULT_ADMIN_EMAIL || "heena03kaur@gmail.com";
+const DEFAULT_OWNER_PASS = process.env.DEFAULT_ADMIN_PASS || crypto.randomBytes(16).toString("hex");
 
 const INITIAL_POSTS_SEED: Post[] = [
   {
@@ -147,6 +152,7 @@ let db: LocalDB = {
 };
 
 let resetTokens: Record<string, { token: string, expiry: number }> = {};
+let verificationTokens: Record<string, { token: string, expiry: number, resendAttempts: number, lastSent: number }> = {};
 let dbPasswords: Record<string, string> = {
   [DEFAULT_OWNER_EMAIL]: DEFAULT_OWNER_PASS,
 };
@@ -160,6 +166,7 @@ function loadDB() {
       if (diskData.users) db.users = diskData.users;
       if (diskData.sessions) db.sessions = diskData.sessions;
       if (diskData.resetTokens) resetTokens = diskData.resetTokens;
+      if (diskData.verificationTokens) verificationTokens = diskData.verificationTokens;
       if (diskData.passwords) {
         dbPasswords = { ...dbPasswords, ...diskData.passwords };
       }
@@ -190,6 +197,7 @@ function saveDB() {
       sessions: db.sessions,
       passwords: dbPasswords,
       resetTokens,
+      verificationTokens,
     };
     fs.writeFileSync(DB_FILE, JSON.stringify(payload, null, 2), "utf-8");
   } catch (err) {
@@ -200,6 +208,7 @@ function saveDB() {
 loadDB();
 
 export const app = express();
+app.set("trust proxy", 1);
 app.use(cors({ origin: true }));
 app.use(express.json());
 
@@ -211,24 +220,33 @@ const authenticateToken = (req: express.Request, res: express.Response, next: ex
     return;
   }
 
-  if (token.startsWith("token-") || token.startsWith("oauth-token-")) {
-    const parts = token.split("-");
-    const email = token.startsWith("oauth-token-") ? parts[2] : parts[1];
-    if (!email) {
-      res.status(401).json({ error: "Access Denied: Invalid Token." });
-      return;
-    }
-    
-    const targetEmail = email;
-    const userObj = db.users.find((u) => u.email.toLowerCase() === targetEmail.toLowerCase());
+  try {
+    const decoded = jwt.verify(token, getJwtSecret()) as { email: string };
+    const userObj = db.users.find((u) => u.email.toLowerCase() === decoded.email.toLowerCase());
     if (userObj) {
       (req as any).user = userObj;
       next();
       return;
     }
+  } catch (err) {
+    // JWT verification failed
   }
   res.status(403).json({ error: "Invalid or expired authorization token." });
 };
+
+const isDev = process.env.NODE_ENV === "development";
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: isDev ? 10000 : 10,
+  message: { error: "Too many requests from this IP, please try again after 15 minutes." }
+});
+
+const emailLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: isDev ? 10000 : 5,
+  message: { error: "Too many email requests from this IP, please try again after an hour." }
+});
 
 const requireAdmin = (req: express.Request, res: express.Response, next: express.NextFunction) => {
   const user = (req as any).user;
@@ -384,7 +402,7 @@ app.delete("/api/admin/deleted-posts/:id/purge", authenticateToken, requireAdmin
 });
 
 // 8. POST /api/login
-app.post("/api/login", (req, res) => {
+app.post("/api/login", authLimiter, (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
     res.status(400).json({ error: "Email address and secure password must be supplied." });
@@ -399,6 +417,11 @@ app.post("/api/login", (req, res) => {
     res.status(400).json({ error: "Invalid credentials. Please verify your email and pass phrase." });
     return;
   }
+  
+  if (userObj.verified === false) {
+    res.status(401).json({ verificationRequired: true, error: "Please verify your email before signing in." });
+    return;
+  }
 
   const savedPass = dbPasswords[normalizedEmail];
   if (!savedPass || !bcrypt.compareSync(password, savedPass)) {
@@ -406,7 +429,12 @@ app.post("/api/login", (req, res) => {
     return;
   }
 
-  const token = `token-${userObj.email}-${Date.now()}`;
+  const token = jwt.sign(
+    { email: userObj.email, isAdmin: !!userObj.isAdmin },
+    getJwtSecret(),
+    { expiresIn: "7d" }
+  );
+  
   res.json({
     token,
     email: userObj.email,
@@ -415,7 +443,7 @@ app.post("/api/login", (req, res) => {
 });
 
 // 9. POST /api/register
-app.post("/api/register", (req, res) => {
+app.post("/api/register", authLimiter, (req, res) => {
   const { email, password, name } = req.body;
   if (!email || !password || !name) {
     res.status(400).json({ error: "All account fields are strictly mandatory." });
@@ -439,18 +467,37 @@ app.post("/api/register", (req, res) => {
     googleAuth: false,
     createdAt: new Date().toISOString(),
     isAdmin: isAdmin,
+    verified: false,
   };
 
   db.users.push(newUser);
   dbPasswords[normalizedEmail] = bcrypt.hashSync(password, 10);
+  
+  const vToken = crypto.randomBytes(32).toString("hex");
+  const expiry = Date.now() + 86400000; // 24 hours
+  verificationTokens[normalizedEmail] = { token: vToken, expiry, resendAttempts: 0, lastSent: Date.now() };
+  
   saveDB();
-
-  const token = `token-${newUser.email}-${Date.now()}`;
-  res.status(201).json({
-    token,
-    email: newUser.email,
-    isAdmin: newUser.isAdmin,
+  
+  // Asynchronously send the email to not block the request
+  sendVerificationEmail(req, normalizedEmail, vToken).catch((err) => {
+    console.error("Critical: Failed to send signup verification email.", err);
   });
+
+  const responsePayload: any = {
+    requireVerification: true,
+    message: "We've sent a verification email. Please verify your email before signing in."
+  };
+
+  if (!process.env.MAIL_USER || !process.env.MAIL_PASS) {
+      const host = req.headers["x-forwarded-host"] || req.get("host") || "localhost:3000";
+      const proto = req.headers["x-forwarded-proto"] || "http";
+      responsePayload.devVerifyLink = process.env.APP_URL 
+        ? `${process.env.APP_URL}?verify=true&token=${vToken}&email=${encodeURIComponent(normalizedEmail)}`
+        : `${proto}://${host}?verify=true&token=${vToken}&email=${encodeURIComponent(normalizedEmail)}`;
+  }
+
+  res.status(201).json(responsePayload);
 });
 
 // 10. PUT /api/credentials
@@ -567,62 +614,104 @@ app.get("/api/admin/metrics", authenticateToken, requireAdmin, (req, res) => {
   res.json(payloadMetrics);
 });
 
+const CONTAINER_BOOT_TIME = new Date().toISOString();
+console.log("[BOOT] Container started at:", CONTAINER_BOOT_TIME);
+
 // MAIL SYSTEM
-const mailTransporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.MAIL_USER,
-    pass: process.env.MAIL_PASS
+console.log("TOP LEVEL MAIL_USER exists:", !!process.env.MAIL_USER);
+
+let mailTransporter: any = null;
+
+function getMailTransporter() {
+  if (!mailTransporter || !mailTransporter.options?.auth?.user) {
+    console.log("[SMTP INIT] Creating mail transporter...");
+    console.log("[SMTP INIT] SMTP Host: smtp.gmail.com");
+    console.log("[SMTP INIT] SMTP Port: 465");
+    console.log("[SMTP INIT] MAIL_USER exists:", !!process.env.MAIL_USER);
+    console.log("[SMTP INIT] MAIL_PASS exists:", !!process.env.MAIL_PASS);
+
+    mailTransporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
+      auth: {
+        user: process.env.MAIL_USER,
+        pass: process.env.MAIL_PASS
+      },
+      logger: true,
+      debug: true
+    });
+
+    // Test connection asynchronously
+    mailTransporter.verify((err: any, success: any) => {
+      if (err) {
+        console.error("[SMTP INIT] Connection/Credentials verification FAILED:", err.message);
+        fs.writeFileSync("mail.log", `[SMTP INIT ERROR at ${new Date().toISOString()}] Connection failed: ${err.message}\n`, { flag: 'a' });
+      } else {
+        console.log("[SMTP INIT] Connection verified successfully! SMTP is ready.");
+        fs.writeFileSync("mail.log", `[SMTP INIT SUCCESS at ${new Date().toISOString()}] Connection verified successfully!\n`, { flag: 'a' });
+      }
+    });
   }
-});
+  return mailTransporter;
+}
 
-app.get("/api/env-debug", (req, res) => {
-  res.json({
-    MAIL_USER: process.env.MAIL_USER || "MISSING",
-    MAIL_PASS: process.env.MAIL_PASS ? "SET" : "MISSING",
-  });
-});
+function logDiagnostics(req: express.Request, context: string) {
+  const host = req.headers["x-forwarded-host"] || req.get("host") || "unknown";
+  const proto = req.headers["x-forwarded-proto"] || "http";
+  const diagnostics = {
+    context,
+    timestamp: new Date().toISOString(),
+    containerBootTime: CONTAINER_BOOT_TIME,
+    request: {
+      url: req.originalUrl,
+      method: req.method,
+      host,
+      proto,
+      headers: {
+        "x-forwarded-for": req.headers["x-forwarded-for"],
+        "user-agent": req.headers["user-agent"]
+      }
+    },
+    environment: {
+      NODE_ENV: process.env.NODE_ENV,
+      MAIL_USER_exists: !!process.env.MAIL_USER,
+      MAIL_PASS_exists: !!process.env.MAIL_PASS,
+      JWT_SECRET_exists: !!process.env.JWT_SECRET,
+      APP_URL: process.env.APP_URL || "not-set"
+    },
+    process: {
+      pid: process.pid,
+      platform: process.platform,
+      nodeVersion: process.version
+    }
+  };
+  console.log(`[DIAGNOSTICS - ${context}]`, JSON.stringify(diagnostics, null, 2));
+  fs.writeFileSync("mail.log", `[DIAGNOSTICS - ${context} at ${new Date().toISOString()}]\n` + JSON.stringify(diagnostics, null, 2) + "\n\n", { flag: 'a' });
+  return diagnostics;
+}
 
-app.post("/api/forgot-password", async (req, res) => {
-  const { email } = req.body;
-  if (!email) {
-    res.status(400).json({ error: "Email address is required." });
-    return;
-  }
-  loadDB();
-  const normalizedEmail = email.trim().toLowerCase();
-  const userObj = db.users.find((u) => u.email.toLowerCase() === normalizedEmail);
-
-  if (!userObj) {
-    res.json({ success: true, message: "If that email exists, a reset link will be sent." });
-    return;
-  }
-
-  const token = crypto.randomBytes(32).toString("hex");
-  const expiry = Date.now() + 3600000; // 1 hour
-  resetTokens[normalizedEmail] = { token, expiry };
-  saveDB();
-
+async function sendVerificationEmail(req: express.Request, normalizedEmail: string, token: string) {
   const host = req.headers["x-forwarded-host"] || req.get("host") || "localhost:3000";
   const proto = req.headers["x-forwarded-proto"] || "http";
-  const resetLink = process.env.APP_URL 
-    ? `${process.env.APP_URL}?reset=true&token=${token}&email=${encodeURIComponent(normalizedEmail)}`
-    : `${proto}://${host}?reset=true&token=${token}&email=${encodeURIComponent(normalizedEmail)}`;
+  const verifyLink = process.env.APP_URL 
+    ? `${process.env.APP_URL}?verify=true&token=${token}&email=${encodeURIComponent(normalizedEmail)}`
+    : `${proto}://${host}?verify=true&token=${token}&email=${encodeURIComponent(normalizedEmail)}`;
 
-  try {
-    if (!process.env.MAIL_USER || !process.env.MAIL_PASS) {
-        console.warn("MAIL_USER and MAIL_PASS are not set. The reset link is: " + resetLink);
-        res.json({ 
-          success: true, 
-          message: "Secrets missing. If you are the developer, check server logs for the link. Otherwise, please configure MAIL_USER and MAIL_PASS." 
-        });
-    } else {
-        await mailTransporter.sendMail({
-          from: `"Divine Obsession" <${process.env.MAIL_USER}>`,
-          to: normalizedEmail,
-          subject: "Divine Obsession Password Reset",
-          text: `Some obsessions are worth protecting. This is your reminder to protect yours.\n\nWe received a request to reset the password associated with your Divine Obsession account.\n\nClick the link below to create a new password and regain access to your account:\n${resetLink}\n\nIf you didn't request this reset, you can safely ignore this email.\n\nStay inspired. Stay obsessed.\n\n— Team Divine Obsession`,
-          html: `<!DOCTYPE html>
+  if (!process.env.MAIL_USER || !process.env.MAIL_PASS) {
+      console.warn("MAIL_USER and MAIL_PASS are not set. The verify link is: " + verifyLink);
+      return;
+  }
+  
+  console.log("Sending email to:", normalizedEmail);
+  console.log("Token generated:", token);
+  const info = await getMailTransporter().sendMail({
+    from: `"Divine Obsession" <${process.env.MAIL_USER}>`,
+    to: normalizedEmail,
+    cc: process.env.MAIL_USER,
+    subject: `Verify Your Divine Obsession Account`,
+    text: `Welcome to Divine Obsession.\n\nPlease verify your email address to activate your account.\n\nClick the link below to verify your email:\n${verifyLink}\n\nStay inspired. Stay obsessed.\n\n— Team Divine Obsession`,
+    html: `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -657,19 +746,19 @@ app.post("/api/forgot-password", async (req, res) => {
         <div class="divider"></div>
       </div>
       <div class="content-body">
-        <div class="headline">Some obsessions are worth protecting. This is your reminder to protect yours.</div>
+        <div class="headline">Welcome to Divine Obsession.</div>
         <div class="text-content">
-          <p>We received a request to reset the password associated with your Divine Obsession account.</p>
-          <p>Click the button below to create a new password and regain access to your account.</p>
+          <p>Please verify your email address to activate your account.</p>
+          <p>Click the button below to confirm your email and complete your registration.</p>
           
           <div class="button-container">
-            <a href="${resetLink}" class="button">Reset Password</a>
+            <a href="${verifyLink}" class="button">Verify Email</a>
           </div>
           
           <div class="footer-divider"></div>
           
           <div class="footer">
-            <p>If you didn't request this reset, you can safely ignore this email.</p>
+            <p>If you didn't create an account, you can safely ignore this email.</p>
           </div>
           <div class="sign-off">Stay inspired. Stay obsessed.<br><br>— Team Divine Obsession</div>
         </div>
@@ -678,12 +767,288 @@ app.post("/api/forgot-password", async (req, res) => {
   </div>
 </body>
 </html>`
+  });
+  console.log("Message ID:", info.messageId);
+  fs.writeFileSync("mail.log", "Token generated: " + token + "\nMail sent successfully to " + normalizedEmail + " with messageId " + info.messageId + " at " + new Date().toISOString() + "\n", { flag: 'a' });
+}
+
+app.get("/api/env-debug", (req, res) => {
+  const diagnostics = logDiagnostics(req, "env-debug");
+  res.json({
+    success: true,
+    diagnostics,
+    MAIL_USER: process.env.MAIL_USER ? "EXISTS (masked)" : "MISSING",
+    MAIL_PASS: process.env.MAIL_PASS ? "EXISTS (masked)" : "MISSING",
+  });
+});
+
+app.get("/api/smtp-test", async (req, res) => {
+  const diagnostics = logDiagnostics(req, "smtp-test");
+  try {
+    await getMailTransporter().verify();
+    res.json({ 
+      success: true, 
+      message: "SMTP connection verified successfully",
+      diagnostics
+    });
+  } catch (error: any) {
+    res.status(500).json({ 
+      success: false, 
+      error: error.message, 
+      stack: error.stack,
+      diagnostics
+    });
+  }
+});
+
+app.get("/api/test-email", async (req, res) => {
+  const diagnostics = logDiagnostics(req, "test-email");
+  try {
+    console.log("Triggering test-email endpoint with delivery verification...");
+    
+    // Support custom recipient via query parameter, default to a public mailinator sandbox
+    const recipient = (req.query.to as string) || "heena03test@mailinator.com";
+    const timestamp = new Date().toISOString();
+    
+    if (!process.env.MAIL_USER || !process.env.MAIL_PASS) {
+      throw new Error("MAIL_USER or MAIL_PASS environment variables are missing.");
+    }
+
+    const testSubject = `PASSWORD RESET DELIVERY TEST ${timestamp}`;
+    const testBody = `This is a diagnostic password reset delivery test.\n\nDelivery test ID: ${timestamp}\n\nReset Link: https://ais-dev-rqsgkn6k3jdlkdlh7e4s5h-139041493732.asia-southeast1.run.app?reset=true&token=delivery_test_token`;
+
+    const info = await getMailTransporter().sendMail({
+      from: `"Divine Obsession" <${process.env.MAIL_USER}>`,
+      to: recipient,
+      subject: testSubject,
+      text: testBody,
+      html: `<h2>Password Reset Delivery Test</h2>
+<p>This is a diagnostic password reset delivery test.</p>
+<p><strong>Delivery test ID:</strong> ${timestamp}</p>
+<p><a href="https://ais-dev-rqsgkn6k3jdlkdlh7e4s5h-139041493732.asia-southeast1.run.app?reset=true&token=delivery_test_token">Reset Password Link</a></p>`,
+      headers: {
+        "X-App-Test-ID": timestamp
+      }
+    });
+    
+    const smtpLog = {
+      timestamp,
+      messageId: info.messageId,
+      response: info.response,
+      accepted: info.accepted,
+      rejected: info.rejected,
+      envelope: info.envelope,
+      subject: testSubject,
+      customHeader: timestamp,
+      message: "DELIVERY TEST sent successfully"
+    };
+    
+    console.log("SMTP response details for DELIVERY TEST:", JSON.stringify(smtpLog, null, 2));
+    fs.writeFileSync("mail.log", "DELIVERY TEST DETAILS:\n" + JSON.stringify(smtpLog, null, 2) + "\n\n", { flag: 'a' });
+    
+    res.json({ 
+      success: true, 
+      messageId: info.messageId, 
+      recipient, 
+      response: info.response,
+      accepted: info.accepted,
+      rejected: info.rejected,
+      subject: testSubject,
+      headers: {
+        "X-App-Test-ID": timestamp
+      },
+      diagnostics
+    });
+  } catch (error: any) {
+    console.error("Delivery test email failed:", error);
+    fs.writeFileSync("mail.log", "DELIVERY TEST EMAIL ERROR at " + new Date().toISOString() + ": " + error.message + "\n" + error.stack + "\n\n", { flag: 'a' });
+    res.status(500).json({ 
+      success: false, 
+      error: error.message, 
+      stack: error.stack,
+      diagnostics
+    });
+  }
+});
+
+app.post("/api/forgot-password", emailLimiter, async (req, res) => {
+  const diagnostics = logDiagnostics(req, "forgot-password");
+  const { email } = req.body;
+  
+  const timestamp = new Date().toISOString();
+  console.log(`[FORGOT PASSWORD STEP 1 - ROUTE RECEIVED] at ${timestamp}. Email: "${email}"`);
+  fs.writeFileSync("mail.log", `[FORGOT PASSWORD STEP 1 - ROUTE RECEIVED at ${timestamp}] Email: "${email}"\n`, { flag: 'a' });
+
+  if (!email) {
+    console.warn("[FORGOT PASSWORD FAILURE] Missing email in request body.");
+    fs.writeFileSync("mail.log", `[FORGOT PASSWORD FAILURE] Missing email in request body.\n\n`, { flag: 'a' });
+    res.status(400).json({ error: "Email address is required.", diagnostics });
+    return;
+  }
+
+  loadDB();
+  const normalizedEmail = email.trim().toLowerCase();
+  const userObj = db.users.find((u) => u.email.toLowerCase() === normalizedEmail);
+
+  console.log(`[FORGOT PASSWORD STEP 2 - USER LOOKUP] Email: "${normalizedEmail}". Found user object: ${!!userObj}`);
+  fs.writeFileSync("mail.log", `[FORGOT PASSWORD STEP 2 - USER LOOKUP] Email: "${normalizedEmail}". Found user object: ${!!userObj}\n`, { flag: 'a' });
+
+  if (!userObj) {
+    console.log(`[FORGOT PASSWORD FLOW END - USER NOT FOUND] Returning 200/success anyway to prevent user enumeration.`);
+    fs.writeFileSync("mail.log", `[FORGOT PASSWORD FLOW END - USER NOT FOUND] Returning 200/success anyway\n\n`, { flag: 'a' });
+    res.json({ 
+      success: true, 
+      message: "If that email exists, a reset link will be sent.",
+      diagnostics: { ...diagnostics, userFound: false }
+    });
+    return;
+  }
+
+  const token = crypto.randomBytes(32).toString("hex");
+  const expiry = Date.now() + 3600000; // 1 hour
+  resetTokens[normalizedEmail] = { token, expiry };
+  saveDB();
+
+  const host = req.headers["x-forwarded-host"] || req.get("host") || "localhost:3000";
+  const proto = req.headers["x-forwarded-proto"] || "http";
+  const resetLink = process.env.APP_URL 
+    ? `${process.env.APP_URL}?reset=true&token=${token}&email=${encodeURIComponent(normalizedEmail)}`
+    : `${proto}://${host}?reset=true&token=${token}&email=${encodeURIComponent(normalizedEmail)}`;
+
+  console.log(`[FORGOT PASSWORD STEP 3 - TOKEN GENERATED] Token: "${token}". Reset Link: "${resetLink}"`);
+  fs.writeFileSync("mail.log", `[FORGOT PASSWORD STEP 3 - TOKEN GENERATED] Token: "${token}". Reset Link: "${resetLink}"\n`, { flag: 'a' });
+
+  try {
+    if (!process.env.MAIL_USER || !process.env.MAIL_PASS) {
+        console.warn("[FORGOT PASSWORD FAILURE - SECRETS MISSING] MAIL_USER and MAIL_PASS are not set. The reset link is: " + resetLink);
+        fs.writeFileSync("mail.log", `[FORGOT PASSWORD FAILURE - SECRETS MISSING] MAIL_USER or MAIL_PASS not defined. Reset link: ${resetLink}\n\n`, { flag: 'a' });
+        res.json({ 
+          success: true, 
+          message: "Secrets missing. If you are the developer, check server logs for the link. Otherwise, please configure MAIL_USER and MAIL_PASS.",
+          diagnostics: { ...diagnostics, secretsMissing: true }
         });
-        res.json({ success: true, message: "If that email exists, a reset link will be sent." });
+    } else {
+        console.log(`[FORGOT PASSWORD STEP 4 - SENDMAIL START] Invoking sendMail via nodemailer transporter.`);
+        console.log(`[FORGOT PASSWORD STEP 4] Sender: "${process.env.MAIL_USER}". Recipient: "${normalizedEmail}"`);
+        fs.writeFileSync("mail.log", `[FORGOT PASSWORD STEP 4 - SENDMAIL START] Sender: "${process.env.MAIL_USER}". Recipient: "${normalizedEmail}"\n`, { flag: 'a' });
+        
+        const info = await getMailTransporter().sendMail({
+          from: `"Divine Obsession" <${process.env.MAIL_USER}>`,
+          to: normalizedEmail,
+          cc: process.env.MAIL_USER,
+          subject: "Reset Your Divine Obsession Password",
+          text: `Some obsessions are worth protecting. This is your reminder to protect yours.\n\nWe received a request to reset the password associated with your Divine Obsession account.\n\nClick the link below to create a new password and regain access to your account:\n${resetLink}\n\nStay inspired. Stay obsessed.\n\n— Team Divine Obsession`,
+          html: `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Inter:wght@300;400;500;600&display=swap');
+  
+  body { background-color: #FAF9F6; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
+  .wrapper { background-color: #FAF9F6; padding: 60px 20px; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+  .container { max-width: 520px; margin: 0 auto; background: #ffffff; padding: 0; text-align: center; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.04); border: 1px solid rgba(125, 176, 149, 0.15); }
+  .top-accent { height: 4px; background-color: #7DB095; width: 100%; }
+  .header { padding: 48px 40px 0 40px; }
+  .logo { font-size: 20px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: #2D3436; font-family: 'Playfair Display', Georgia, serif; }
+  .divider { width: 32px; height: 2px; background-color: #7DB095; margin: 24px auto 32px auto; opacity: 0.8; }
+  .content-body { padding: 0 40px 48px 40px; text-align: left; }
+  .quote-box { 
+    background-color: #F6F8F6; 
+    border-left: 3px solid #7DB095; 
+    padding: 20px; 
+    margin-bottom: 28px; 
+    border-top-right-radius: 6px; 
+    border-bottom-right-radius: 6px; 
+  }
+  .quote-text { 
+    font-family: 'Playfair Display', Georgia, serif; 
+    font-size: 16px; 
+    font-style: italic; 
+    color: #2D3436; 
+    line-height: 1.6; 
+    margin: 0;
+  }
+  .text-content { font-size: 15px; line-height: 1.6; color: #555555; }
+  .text-content p { margin: 0 0 16px 0; }
+  .button-container { margin: 40px 0; text-align: center; }
+  .button { background-color: #7DB095; color: #ffffff !important; text-decoration: none; padding: 16px 36px; font-weight: 500; letter-spacing: 1px; font-size: 14px; display: inline-block; border-radius: 8px; transition: background-color 0.2s ease; }
+  .footer-divider { width: 100%; height: 1px; background-color: rgba(125, 176, 149, 0.15); margin: 32px 0; }
+  .footer { font-size: 13px; color: #888888; text-align: center; line-height: 1.6; }
+</style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="container">
+      <div class="top-accent"></div>
+      <div class="header">
+        <div class="logo">DIVINE OBSESSION</div>
+        <div class="divider"></div>
+      </div>
+      <div class="content-body">
+        <div class="quote-box">
+          <p class="quote-text">“Some obsessions are worth protecting. This is your reminder to protect yours.”</p>
+        </div>
+        <div class="text-content">
+          <p>We received a request to reset the password associated with your Divine Obsession account.</p>
+          <p>Click the button below to create a new password and regain access to your account.</p>
+          
+          <div class="button-container">
+            <a href="${resetLink}" class="button">Reset Password</a>
+          </div>
+          
+          <p style="font-size: 13px; color: #888888; text-align: center; margin-top: 24px;">
+            If you did not make this request, you can safely ignore this email. Your password will remain unchanged.
+          </p>
+          
+          <div class="footer-divider"></div>
+          
+          <div class="footer">
+            Stay inspired. Stay obsessed.<br>
+            <strong>— Team Divine Obsession</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`
+        });
+        
+        const smtpLog = {
+          timestamp: new Date().toISOString(),
+          messageId: info.messageId,
+          response: info.response,
+          accepted: info.accepted,
+          rejected: info.rejected,
+          envelope: info.envelope,
+          tokenGenerated: token,
+          resetLink: resetLink,
+          message: "Forgot password email sent successfully"
+        };
+        
+        console.log("[FORGOT PASSWORD STEP 5 - SENDMAIL RESPONSE]:", JSON.stringify(smtpLog, null, 2));
+        fs.writeFileSync("mail.log", "FORGOT PASSWORD DETAILS (STEP 5):\n" + JSON.stringify(smtpLog, null, 2) + "\n\n", { flag: 'a' });
+        
+        res.json({ 
+          success: true, 
+          message: "If that email exists, a reset link will be sent.",
+          messageId: info.messageId,
+          response: info.response,
+          accepted: info.accepted,
+          rejected: info.rejected,
+          diagnostics: { ...diagnostics, userFound: true, emailSent: true }
+        });
     }
   } catch (err: any) {
-    console.error("Failed to send email:", err);
-    res.status(500).json({ error: "Failed to send reset email due to server error. " + (err.message || "") });
+    console.error("[FORGOT PASSWORD FAILURE - EXCEPTION]:", err);
+    fs.writeFileSync("mail.log", "[FORGOT PASSWORD FAILURE - EXCEPTION] Mail error: " + err.message + "\n" + err.stack + "\n\n", { flag: 'a' });
+    res.status(500).json({ 
+      error: "Failed to send reset email due to server error. " + (err.message || ""),
+      stack: err.stack,
+      diagnostics
+    });
   }
 });
 
@@ -712,6 +1077,110 @@ app.post("/api/reset-password", async (req, res) => {
   saveDB();
 
   res.json({ success: true, message: "Password has been successfully reset." });
+});
+
+app.post("/api/verify-email", (req, res) => {
+  const { email, token } = req.body;
+  if (!email || !token) {
+    res.status(400).json({ error: "Missing verification parameters." });
+    return;
+  }
+  
+  loadDB();
+  const normalizedEmail = email.trim().toLowerCase();
+  const userObj = db.users.find(u => u.email.toLowerCase() === normalizedEmail);
+  
+  if (!userObj) {
+    res.status(404).json({ error: "Account not found." });
+    return;
+  }
+  
+  if (userObj.verified !== false) {
+    res.json({ success: true, message: "Account is already verified." });
+    return;
+  }
+  
+  const tokenRecord = verificationTokens[normalizedEmail];
+  if (!tokenRecord || tokenRecord.token !== token) {
+    res.status(400).json({ error: "Invalid verification token." });
+    return;
+  }
+  
+  if (Date.now() > tokenRecord.expiry) {
+    res.status(400).json({ error: "Verification link has expired. Please request a new one." });
+    return;
+  }
+  
+  userObj.verified = true;
+  delete verificationTokens[normalizedEmail];
+  saveDB();
+  
+  const authToken = jwt.sign(
+    { email: userObj.email, isAdmin: !!userObj.isAdmin },
+    getJwtSecret(),
+    { expiresIn: "7d" }
+  );
+  res.json({ success: true, message: "Email verified successfully.", token: authToken, email: userObj.email, isAdmin: !!userObj.isAdmin });
+});
+
+app.post("/api/resend-verification", emailLimiter, async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    res.status(400).json({ error: "Email address is required." });
+    return;
+  }
+  
+  loadDB();
+  const normalizedEmail = email.trim().toLowerCase();
+  const userObj = db.users.find(u => u.email.toLowerCase() === normalizedEmail);
+  
+  if (!userObj) {
+    res.status(404).json({ error: "Account not found." });
+    return;
+  }
+  
+  if (userObj.verified !== false) {
+    res.status(400).json({ error: "Account is already verified." });
+    return;
+  }
+  
+  let tokenRecord = verificationTokens[normalizedEmail];
+  
+  // Rate limiting / Spam prevention
+  if (tokenRecord) {
+    const timeSinceLastSent = Date.now() - tokenRecord.lastSent;
+    if (timeSinceLastSent < 60000) { // 1 minute cooldown
+      res.status(429).json({ error: "Please wait before requesting another verification email." });
+      return;
+    }
+    if (tokenRecord.resendAttempts >= 5) {
+      res.status(429).json({ error: "Too many verification requests. Please try again later." });
+      return;
+    }
+  }
+  
+  const vToken = crypto.randomBytes(32).toString("hex");
+  const expiry = Date.now() + 86400000; // 24 hours
+  const attempts = tokenRecord ? tokenRecord.resendAttempts + 1 : 1;
+  
+  verificationTokens[normalizedEmail] = { token: vToken, expiry, resendAttempts: attempts, lastSent: Date.now() };
+  saveDB();
+  
+  sendVerificationEmail(req, normalizedEmail, vToken).catch((err) => {
+    console.error("Critical: Failed to resend verification email.", err);
+  });
+  
+  const responsePayload: any = { success: true, message: "Verification email sent." };
+  
+  if (!process.env.MAIL_USER || !process.env.MAIL_PASS) {
+      const host = req.headers["x-forwarded-host"] || req.get("host") || "localhost:3000";
+      const proto = req.headers["x-forwarded-proto"] || "http";
+      responsePayload.devVerifyLink = process.env.APP_URL 
+        ? `${process.env.APP_URL}?verify=true&token=${vToken}&email=${encodeURIComponent(normalizedEmail)}`
+        : `${proto}://${host}?verify=true&token=${vToken}&email=${encodeURIComponent(normalizedEmail)}`;
+  }
+  
+  res.json(responsePayload);
 });
 
 export const api = onRequest(app);

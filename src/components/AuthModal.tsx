@@ -17,18 +17,54 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, closable = true }: 
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [devVerifyLink, setDevVerifyLink] = useState<string | null>(null);
 
   useEffect(() => {
     setError(null);
     setSuccessMsg(null);
+    setNeedsVerification(false);
+    setDevVerifyLink(null);
   }, [tab, isForgotPassword]);
 
   if (!isOpen) return null;
+
+  const handleResendVerification = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      setDevVerifyLink(null);
+      const res = await fetch("/api/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to resend verification email.");
+      }
+      
+      if (data.devVerifyLink) {
+        setDevVerifyLink(data.devVerifyLink);
+        setSuccessMsg("Check configuration. Dev Verification URL is printed to DevTools Console.");
+        console.log("-----------------------------------------");
+        console.log("DEV VERIFICATION LINK (Copy & Paste):", data.devVerifyLink);
+        console.log("-----------------------------------------");
+      } else {
+        setSuccessMsg(data.message || "Verification email sent.");
+      }
+    } catch (err: any) {
+      setError(err.message || "An error occurred.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccessMsg(null);
+    setNeedsVerification(false);
     setLoading(true);
 
     if (isForgotPassword) {
@@ -38,13 +74,23 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, closable = true }: 
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: email.trim().toLowerCase() }),
         });
-        const data = await response.json();
+        
+        const text = await response.text();
+        if (text.startsWith("<!DOCTYPE") || text.includes("<html")) {
+          throw new Error("Cannot send email from GitHub Pages. A backend server is required.");
+        }
+        
+        const data = JSON.parse(text);
         if (!response.ok) {
           throw new Error(data.error || "Failed to send reset email.");
         }
         setSuccessMsg(data.message || "Reset link sent successfully.");
       } catch (err: any) {
-        setError(err.message || "An error occurred.");
+        if (err.message.includes("network") || err.message.includes("pattern") || err.message.includes("JSON")) {
+          setError("Cannot send emails from static hosting like GitHub Pages. Please deploy to Cloud Run.");
+        } else {
+          setError(err.message || "An error occurred.");
+        }
       } finally {
         setLoading(false);
       }
@@ -63,21 +109,57 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, closable = true }: 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(bodyPayload),
       });
-      const data = await response.json().catch(() => ({ error: "Server response was not valid JSON." }));
+
+      const text = await response.text();
+      if (text.startsWith("<!DOCTYPE") || text.includes("<html")) {
+        throw new Error("Cannot authenticate from GitHub Pages. A backend server is required.");
+      }
+
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        data = { error: "Server response was not valid JSON." };
+      }
+
       if (!response.ok) {
+        if (data.verificationRequired) {
+          setNeedsVerification(true);
+          throw new Error(data.error || "Please verify your email.");
+        }
         throw new Error(
           data.error || "Authentication failed. Please verify your credentials."
         );
       }
+      
+      if (data.requireVerification) {
+        if (data.devVerifyLink) {
+           setDevVerifyLink(data.devVerifyLink);
+           setSuccessMsg("Check configuration. Dev Verification URL is printed to DevTools Console.");
+           console.log("-----------------------------------------");
+           console.log("DEV VERIFICATION LINK (Copy & Paste):", data.devVerifyLink);
+           console.log("-----------------------------------------");
+        } else {
+           setSuccessMsg(data.message || "Please check your email to verify your account.");
+        }
+        setNeedsVerification(true);
+        setTab("login");
+        return;
+      }
+      
       onLoginSuccess(data.token, data.email, !!data.isAdmin);
       setEmail("");
       setPassword("");
       onClose();
     } catch (err: any) {
-      setError(
-        err.message ||
-          "An unexpected error occurred during active credentials validation."
-      );
+      if (err.message.includes("pattern") || err.message.includes("Unexpected token")) {
+        setError("Cannot authenticate from static hosting like GitHub Pages. Please deploy to Cloud Run.");
+      } else {
+        setError(
+          err.message ||
+            "An unexpected error occurred during active credentials validation."
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -143,17 +225,34 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, closable = true }: 
 
         <div className="p-6 space-y-4">
           {successMsg && (
-            <div className="px-4 py-3 bg-[#7DB095]/10 border border-[#7DB095]/20 rounded-xl text-[#7DB095] flex items-start gap-2.5 text-xs font-sans">
+            <div className="px-4 py-3 bg-[#7DB095]/10 border border-[#7DB095]/20 rounded-xl text-[#7DB095] flex flex-col gap-2 text-xs font-sans">
               <span className="leading-relaxed">{successMsg}</span>
+              {devVerifyLink && (
+                  <a href={devVerifyLink} className="inline-block mt-2 px-3 py-1.5 bg-[#7DB095]/20 hover:bg-[#7DB095]/30 text-[#7DB095] rounded-md font-medium text-xs transition-colors truncate">
+                    Test Link: Click here to verify
+                  </a>
+              )}
             </div>
           )}
           {error && (
             <div
-              className="px-4 py-3 bg-red-50 border border-red-200/50 rounded-xl text-red-600 flex items-start gap-2.5 text-xs font-sans"
+              className="px-4 py-3 bg-red-50 border border-red-200/50 rounded-xl text-red-600 flex flex-col gap-2 text-xs font-sans"
               id="login-error-alert"
             >
-              <ShieldAlert size={16} className="shrink-0 mt-0.5" />
-              <span className="leading-relaxed">{error}</span>
+              <div className="flex items-start gap-2.5">
+                <ShieldAlert size={16} className="shrink-0 mt-0.5" />
+                <span className="leading-relaxed">{error}</span>
+              </div>
+              {needsVerification && (
+                <button
+                  type="button"
+                  onClick={handleResendVerification}
+                  disabled={loading || !email}
+                  className="mt-1 self-start px-3 py-1.5 bg-red-100 text-red-700 hover:bg-red-200 rounded-md font-medium text-xs transition-colors disabled:opacity-50"
+                >
+                  {loading ? "Re-sending..." : "Resend Verification Email"}
+                </button>
+              )}
             </div>
           )}
 
@@ -189,7 +288,7 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, closable = true }: 
                   <Mail size={15} />
                 </div>
                 <input
-                  type="text"
+                  type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}

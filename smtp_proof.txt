@@ -1,0 +1,42 @@
+◇ injected env (0) from .env // tip: ⌘ enable debugging { debug: true }
+[2026-06-24 16:50:42] DEBUG Creating transport: nodemailer (9.0.1; +https://nodemailer.com/; SMTP/9.0.1[client:9.0.1])
+Sending email to: heena03kaur@gmail.com
+[2026-06-24 16:50:42] DEBUG Sending mail using SMTP/9.0.1[client:9.0.1]
+[2026-06-24 16:50:42] DEBUG [EZC3mJrXAWs] Resolved smtp.gmail.com as 2404:6800:4003:c01::6d [cache miss]
+[2026-06-24 16:50:42] INFO  [EZC3mJrXAWs] Secure connection established to 2404:6800:4003:c01::6d:465
+[2026-06-24 16:50:43] DEBUG [EZC3mJrXAWs] S: 220 smtp.gmail.com ESMTP 98e67ed59e1d1-37def6bac36sm463099a91.1 - gsmtp
+[2026-06-24 16:50:43] DEBUG [EZC3mJrXAWs] C: EHLO [127.0.0.1]
+[2026-06-24 16:50:43] DEBUG [EZC3mJrXAWs] S: 250-smtp.gmail.com at your service, [2600:1900:0:3e00::d01]
+[2026-06-24 16:50:43] DEBUG [EZC3mJrXAWs] S: 250-SIZE 35882577
+[2026-06-24 16:50:43] DEBUG [EZC3mJrXAWs] S: 250-8BITMIME
+[2026-06-24 16:50:43] DEBUG [EZC3mJrXAWs] S: 250-AUTH LOGIN PLAIN XOAUTH2 PLAIN-CLIENTTOKEN OAUTHBEARER XOAUTH
+[2026-06-24 16:50:43] DEBUG [EZC3mJrXAWs] S: 250-ENHANCEDSTATUSCODES
+[2026-06-24 16:50:43] DEBUG [EZC3mJrXAWs] S: 250-PIPELINING
+[2026-06-24 16:50:43] DEBUG [EZC3mJrXAWs] S: 250-CHUNKING
+[2026-06-24 16:50:43] DEBUG [EZC3mJrXAWs] S: 250 SMTPUTF8
+[2026-06-24 16:50:43] DEBUG [EZC3mJrXAWs] SMTP handshake finished
+[2026-06-24 16:50:43] DEBUG [EZC3mJrXAWs] C: AUTH PLAIN AGhlZW5hMDNrYXVyQGdtYWlsLmNvbQAvKiBzZWNyZXQgKi8=
+[2026-06-24 16:50:43] DEBUG [EZC3mJrXAWs] S: 235 2.7.0 Accepted
+[2026-06-24 16:50:43] INFO  [EZC3mJrXAWs] User "heena03kaur@gmail.com" authenticated
+[2026-06-24 16:50:43] INFO  Sending message <41cca904-fa4d-2439-d6c3-1f25afdc1646@gmail.com> to <heena03kaur@gmail.com>
+[2026-06-24 16:50:43] DEBUG [EZC3mJrXAWs] C: MAIL FROM:<heena03kaur@gmail.com>
+[2026-06-24 16:50:43] DEBUG [EZC3mJrXAWs] S: 250 2.1.0 OK 98e67ed59e1d1-37def6bac36sm463099a91.1 - gsmtp
+[2026-06-24 16:50:43] DEBUG [EZC3mJrXAWs] C: RCPT TO:<heena03kaur@gmail.com>
+[2026-06-24 16:50:43] DEBUG [EZC3mJrXAWs] S: 250 2.1.5 OK 98e67ed59e1d1-37def6bac36sm463099a91.1 - gsmtp
+[2026-06-24 16:50:43] DEBUG [EZC3mJrXAWs] C: DATA
+[2026-06-24 16:50:44] DEBUG [EZC3mJrXAWs] S: 354 Go ahead 98e67ed59e1d1-37def6bac36sm463099a91.1 - gsmtp
+[2026-06-24 16:50:44] DEBUG [EZC3mJrXAWs] From: Divine Obsession <heena03kaur@gmail.com>
+[2026-06-24 16:50:44] DEBUG [EZC3mJrXAWs] To: heena03kaur@gmail.com
+[2026-06-24 16:50:44] DEBUG [EZC3mJrXAWs] Subject: Divine Obsession Password Reset
+[2026-06-24 16:50:44] DEBUG [EZC3mJrXAWs] Message-ID: <41cca904-fa4d-2439-d6c3-1f25afdc1646@gmail.com>
+[2026-06-24 16:50:44] DEBUG [EZC3mJrXAWs] Content-Transfer-Encoding: 7bit
+[2026-06-24 16:50:44] DEBUG [EZC3mJrXAWs] Date: Wed, 24 Jun 2026 16:50:42 +0000
+[2026-06-24 16:50:44] DEBUG [EZC3mJrXAWs] MIME-Version: 1.0
+[2026-06-24 16:50:44] DEBUG [EZC3mJrXAWs] Content-Type: text/plain; charset=utf-8
+[2026-06-24 16:50:44] DEBUG [EZC3mJrXAWs] 
+[2026-06-24 16:50:44] DEBUG [EZC3mJrXAWs] Test of the actual content.
+[2026-06-24 16:50:44] DEBUG [EZC3mJrXAWs] .
+[2026-06-24 16:50:44] INFO  [EZC3mJrXAWs] <345 bytes encoded mime message (source size 342 bytes)>
+[2026-06-24 16:50:44] DEBUG [EZC3mJrXAWs] S: 250 2.0.0 OK  1782319844 98e67ed59e1d1-37def6bac36sm463099a91.1 - gsmtp
+[2026-06-24 16:50:44] DEBUG [EZC3mJrXAWs] Closing connection to the server using "end"
+Message ID: <41cca904-fa4d-2439-d6c3-1f25afdc1646@gmail.com>

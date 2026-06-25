@@ -36,6 +36,7 @@ export default function App() {
   
   const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
   const [resetTokenInfo, setResetTokenInfo] = useState<{ token: string, email: string } | null>(null);
+  const [verificationFeedback, setVerificationFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
   useEffect(() => {
     try {
@@ -47,6 +48,38 @@ export default function App() {
         });
         // Clean up URL
         window.history.replaceState({}, document.title || "", window.location.pathname);
+      }
+      
+      if (params.get("verify") === "true" && params.get("token") && params.get("email")) {
+        const vToken = params.get("token")!;
+        const vEmail = params.get("email")!;
+        window.history.replaceState({}, document.title || "", window.location.pathname);
+        
+        fetch("/api/verify-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: vEmail, token: vToken })
+        }).then(res => res.json()).then(data => {
+          if (data.success) {
+            setVerificationFeedback({ type: 'success', message: "Your email has been verified. You can now access your account." });
+            if (data.token) {
+              setToken(data.token);
+              setUserEmail(data.email);
+              setIsAdmin(!!data.isAdmin);
+              try {
+                safeLocalStorage.setItem("sage_blog_token", data.token);
+                safeLocalStorage.setItem("sage_blog_email", data.email);
+                safeLocalStorage.setItem("sage_blog_is_admin", String(!!data.isAdmin));
+              } catch (e) {
+                // Ignore LS error
+              }
+            }
+          } else {
+            setVerificationFeedback({ type: 'error', message: data.error || "Failed to verify email." });
+          }
+        }).catch(err => {
+          setVerificationFeedback({ type: 'error', message: "Failed to communicate with the server." });
+        });
       }
     } catch (e) {
       console.warn("Error modifying history:", e);
@@ -487,6 +520,20 @@ export default function App() {
       />
 
       <main className="flex-grow w-full" id="page-content-wrapper">
+        {verificationFeedback && (
+          <div className={`max-w-4xl mx-auto mt-6 px-6 ${
+            verificationFeedback.type === 'success' ? 'text-[#7DB095]' : 'text-red-500'
+          }`}>
+            <div className={`px-4 py-3 rounded-xl border text-sm font-sans flex items-start justify-between ${
+              verificationFeedback.type === 'success'
+                ? 'bg-[#7DB095]/10 border-[#7DB095]/20'
+                : 'bg-red-50 border-red-200/50'
+            }`}>
+              <span>{verificationFeedback.message}</span>
+              <button onClick={() => setVerificationFeedback(null)} className="opacity-70 hover:opacity-100">✕</button>
+            </div>
+          </div>
+        )}
         {renderActiveView()}
       </main>
 
