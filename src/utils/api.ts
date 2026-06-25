@@ -7,15 +7,5 @@ export function getApiUrl(path: string): string {
     return `${base}${path}`;
   }
   
-  const isStaticHosting = 
-    window.location.hostname.includes("github.io") || 
-    window.location.hostname.includes("vercel.app") ||
-    window.location.hostname.includes("netlify.app") ||
-    window.location.hostname.includes("amplifyapp.com");
-
-  if (isStaticHosting) {
-    // Automatically fall back to the live public Cloud Run backend URL
-    return `https://ais-pre-rqsgkn6k3jdlkdlh7e4s5h-139041493732.asia-southeast1.run.app${path}`;
-  }
   return path;
 }
