@@ -80,13 +80,24 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, closable = true }: 
           throw new Error("Cannot send email from GitHub Pages. A backend server is required.");
         }
         
-        const data = JSON.parse(text);
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          if (!response.ok) {
+            throw new Error(text || "Server returned an error.");
+          } else {
+            throw new Error("Server response was not valid JSON.");
+          }
+        }
+
         if (!response.ok) {
           throw new Error(data.error || "Failed to send reset email.");
         }
         setSuccessMsg(data.message || "Reset link sent successfully.");
       } catch (err: any) {
-        if (err.message.includes("network") || err.message.includes("pattern") || err.message.includes("JSON")) {
+        const isStaticHosting = window.location.hostname.includes("github.io");
+        if (isStaticHosting && (err.message.includes("network") || err.message.includes("pattern") || err.message.includes("JSON") || err.message.includes("Unexpected token"))) {
           setError("Cannot send emails from static hosting like GitHub Pages. Please deploy to Cloud Run.");
         } else {
           setError(err.message || "An error occurred.");
@@ -119,7 +130,11 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, closable = true }: 
       try {
         data = JSON.parse(text);
       } catch (e) {
-        data = { error: "Server response was not valid JSON." };
+        if (!response.ok) {
+          throw new Error(text || "Server returned an error.");
+        } else {
+          throw new Error("Server response was not valid JSON.");
+        }
       }
 
       if (!response.ok) {
@@ -152,7 +167,8 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, closable = true }: 
       setPassword("");
       onClose();
     } catch (err: any) {
-      if (err.message.includes("pattern") || err.message.includes("Unexpected token")) {
+      const isStaticHosting = window.location.hostname.includes("github.io");
+      if (isStaticHosting && (err.message.includes("pattern") || err.message.includes("Unexpected token") || err.message.includes("JSON"))) {
         setError("Cannot authenticate from static hosting like GitHub Pages. Please deploy to Cloud Run.");
       } else {
         setError(
