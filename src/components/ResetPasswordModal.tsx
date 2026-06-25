@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Lock, ShieldAlert, Loader2, X } from "lucide-react";
+import { getApiUrl } from "../utils/api";
 
 interface ResetProps {
   email: string;
@@ -22,7 +23,7 @@ export function ResetPasswordModal({ email, token, onClose }: ResetProps) {
     setLoading(true);
     setError(null);
     try {
-      const resp = await fetch("/api/reset-password", {
+      const resp = await fetch(getApiUrl("/api/reset-password"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, token, newPassword: password })

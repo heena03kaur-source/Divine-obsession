@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Mail, Lock, ShieldAlert, X, Loader2, User } from "lucide-react";
+import { getApiUrl } from "../utils/api";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -34,7 +35,7 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, closable = true }: 
       setLoading(true);
       setError(null);
       setDevVerifyLink(null);
-      const res = await fetch("/api/resend-verification", {
+      const res = await fetch(getApiUrl("/api/resend-verification"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim().toLowerCase() }),
@@ -69,7 +70,7 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, closable = true }: 
 
     if (isForgotPassword) {
       try {
-        const response = await fetch("/api/forgot-password", {
+        const response = await fetch(getApiUrl("/api/forgot-password"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: email.trim().toLowerCase() }),
@@ -120,7 +121,7 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, closable = true }: 
       : { email: email.trim().toLowerCase(), password: password.trim(), name: name.trim() || email.split("@")[0] };
 
     try {
-      const response = await fetch(apiPath, {
+      const response = await fetch(getApiUrl(apiPath), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(bodyPayload),

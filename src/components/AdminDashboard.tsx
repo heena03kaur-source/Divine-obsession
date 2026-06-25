@@ -1,5 +1,6 @@
 import { safeLocalStorage, safeSessionStorage } from "../lib/storage";
 import React, { useState, useEffect } from "react";
+import { getApiUrl } from "../utils/api";
 import {
   ArrowLeft,
   RotateCw,
@@ -81,9 +82,9 @@ export function AdminDashboard({
     try {
       const headers = { Authorization: `Bearer ${token}` };
       const [metricsRes, postsRes, deletedRes] = await Promise.all([
-        fetch("/api/admin/metrics", { headers }),
-        fetch("/api/posts"),
-        fetch("/api/admin/deleted-posts", { headers }),
+        fetch(getApiUrl("/api/admin/metrics"), { headers }),
+        fetch(getApiUrl("/api/posts")),
+        fetch(getApiUrl("/api/admin/deleted-posts"), { headers }),
       ]);
 
       if (!metricsRes.ok) {
@@ -137,7 +138,7 @@ export function AdminDashboard({
     setSettingsSaving(true);
 
     try {
-      const response = await fetch("/api/credentials", {
+      const response = await fetch(getApiUrl("/api/credentials"), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -172,7 +173,7 @@ export function AdminDashboard({
     setDeletingPostId(id);
     setErrorMsg(null);
     try {
-      const response = await fetch(`/api/posts/${id}`, {
+      const response = await fetch(getApiUrl(`/api/posts/${id}`), {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -203,7 +204,7 @@ export function AdminDashboard({
       setPostsDeleteConfirmId(null);
       
       // Re-fetch deleted posts
-      const deletedRes = await fetch("/api/admin/deleted-posts", {
+      const deletedRes = await fetch(getApiUrl("/api/admin/deleted-posts"), {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (deletedRes.ok) {
@@ -221,7 +222,7 @@ export function AdminDashboard({
     setRestoringId(id);
     setErrorMsg(null);
     try {
-      const response = await fetch(`/api/admin/deleted-posts/${id}/restore`, {
+      const response = await fetch(getApiUrl(`/api/admin/deleted-posts/${id}/restore`), {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -264,7 +265,7 @@ export function AdminDashboard({
     setPurgingId(id);
     setErrorMsg(null);
     try {
-      const response = await fetch(`/api/admin/deleted-posts/${id}/purge`, {
+      const response = await fetch(getApiUrl(`/api/admin/deleted-posts/${id}/purge`), {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });

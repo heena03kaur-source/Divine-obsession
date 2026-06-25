@@ -1,5 +1,6 @@
 import { safeLocalStorage, safeSessionStorage } from "./lib/storage";
 import React, { useState, useEffect, useMemo } from "react";
+import { getApiUrl } from "./utils/api";
 import { Navbar } from "./components/Navbar";
 import { BlogFeed } from "./components/BlogFeed";
 import { TopicsList } from "./components/TopicsList";
@@ -55,7 +56,7 @@ export default function App() {
         const vEmail = params.get("email")!;
         window.history.replaceState({}, document.title || "", window.location.pathname);
         
-        fetch("/api/verify-email", {
+        fetch(getApiUrl("/api/verify-email"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: vEmail, token: vToken })
@@ -135,7 +136,7 @@ export default function App() {
         console.log(`Auto-healing: restoring ${missingPosts.length} posts back to the server...`);
         for (const postToRestore of missingPosts) {
           try {
-            await fetch("/api/posts", {
+            await fetch(getApiUrl("/api/posts"), {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -156,7 +157,7 @@ export default function App() {
           }
         }
         // Re-read from server after healing completes
-        const reloadResp = await fetch("/api/posts");
+        const reloadResp = await fetch(getApiUrl("/api/posts"));
         if (reloadResp.ok) {
           const freshData = await reloadResp.json();
           setPosts(freshData);
@@ -178,7 +179,7 @@ export default function App() {
   useEffect(() => {
     // Prevent frontend local storage spoofing
     if (token && isAdmin) {
-      fetch("/api/admin/metrics", {
+      fetch(getApiUrl("/api/admin/metrics"), {
         headers: { Authorization: `Bearer ${token}` }
       }).then(res => {
         if (!res.ok) {
@@ -196,7 +197,7 @@ export default function App() {
   const loadPosts = async () => {
     setLoading(true);
     try {
-      const resp = await fetch("/api/posts");
+      const resp = await fetch(getApiUrl("/api/posts"));
       if (!resp.ok) {
         throw new Error("Could not retrieve the blog collection.");
       }
@@ -261,7 +262,7 @@ export default function App() {
       }
 
       try {
-        await fetch("/api/analytics/ping", {
+        await fetch(getApiUrl("/api/analytics/ping"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

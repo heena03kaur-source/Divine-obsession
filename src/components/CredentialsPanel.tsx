@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { ArrowLeft, ShieldCheck, Check, AlertTriangle, Loader2 } from "lucide-react";
+import { getApiUrl } from "../utils/api";
 
 interface CredentialsPanelProps {
   token: string | null;
@@ -39,7 +40,7 @@ export function CredentialsPanel({ token, onSuccess, onCancel }: CredentialsPane
     setSaving(true);
 
     try {
-      const response = await fetch("/api/credentials", {
+      const response = await fetch(getApiUrl("/api/credentials"), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
