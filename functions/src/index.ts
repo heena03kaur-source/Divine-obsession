@@ -496,11 +496,8 @@ app.post("/api/register", authLimiter, (req, res) => {
   };
 
   if (!process.env.MAIL_USER || !process.env.MAIL_PASS) {
-      const host = req.headers["x-forwarded-host"] || req.get("host") || "localhost:3000";
-      const proto = req.headers["x-forwarded-proto"] || "http";
-      responsePayload.devVerifyLink = process.env.APP_URL 
-        ? `${process.env.APP_URL}?verify=true&token=${vToken}&email=${encodeURIComponent(normalizedEmail)}`
-        : `${proto}://${host}?verify=true&token=${vToken}&email=${encodeURIComponent(normalizedEmail)}`;
+      const baseUrl = getPublicAppUrl(req);
+      responsePayload.devVerifyLink = `${baseUrl}?verify=true&token=${vToken}&email=${encodeURIComponent(normalizedEmail)}`;
   }
 
   res.status(201).json(responsePayload);
@@ -697,12 +694,30 @@ function logDiagnostics(req: express.Request, context: string) {
   return diagnostics;
 }
 
+function getPublicAppUrl(req: express.Request): string {
+  let url = process.env.APP_URL;
+  if (!url) {
+    const host = req.headers["x-forwarded-host"] || req.get("host") || "localhost:3000";
+    const proto = req.headers["x-forwarded-proto"] || "http";
+    url = `${proto}://${host}`;
+  }
+  
+  // Clean up any trailing slash
+  if (url.endsWith("/")) {
+    url = url.slice(0, -1);
+  }
+
+  // Ensure we use the public shared app URL instead of the private sandboxed dev URL
+  if (url.includes("ais-dev-")) {
+    url = url.replace("ais-dev-", "ais-pre-");
+  }
+  
+  return url;
+}
+
 async function sendVerificationEmail(req: express.Request, normalizedEmail: string, token: string) {
-  const host = req.headers["x-forwarded-host"] || req.get("host") || "localhost:3000";
-  const proto = req.headers["x-forwarded-proto"] || "http";
-  const verifyLink = process.env.APP_URL 
-    ? `${process.env.APP_URL}?verify=true&token=${token}&email=${encodeURIComponent(normalizedEmail)}`
-    : `${proto}://${host}?verify=true&token=${token}&email=${encodeURIComponent(normalizedEmail)}`;
+  const baseUrl = getPublicAppUrl(req);
+  const verifyLink = `${baseUrl}?verify=true&token=${token}&email=${encodeURIComponent(normalizedEmail)}`;
 
   if (!process.env.MAIL_USER || !process.env.MAIL_PASS) {
       console.warn("MAIL_USER and MAIL_PASS are not set. The verify link is: " + verifyLink);
@@ -915,11 +930,8 @@ app.post("/api/forgot-password", emailLimiter, async (req, res) => {
   resetTokens[normalizedEmail] = { token, expiry };
   saveDB();
 
-  const host = req.headers["x-forwarded-host"] || req.get("host") || "localhost:3000";
-  const proto = req.headers["x-forwarded-proto"] || "http";
-  const resetLink = process.env.APP_URL 
-    ? `${process.env.APP_URL}?reset=true&token=${token}&email=${encodeURIComponent(normalizedEmail)}`
-    : `${proto}://${host}?reset=true&token=${token}&email=${encodeURIComponent(normalizedEmail)}`;
+  const baseUrl = getPublicAppUrl(req);
+  const resetLink = `${baseUrl}?reset=true&token=${token}&email=${encodeURIComponent(normalizedEmail)}`;
 
   console.log(`[FORGOT PASSWORD STEP 3 - TOKEN GENERATED] Token: "${token}". Reset Link: "${resetLink}"`);
   fs.writeFileSync("mail.log", `[FORGOT PASSWORD STEP 3 - TOKEN GENERATED] Token: "${token}". Reset Link: "${resetLink}"\n`, { flag: 'a' });
@@ -1179,11 +1191,8 @@ app.post("/api/resend-verification", emailLimiter, async (req, res) => {
   const responsePayload: any = { success: true, message: "Verification email sent." };
   
   if (!process.env.MAIL_USER || !process.env.MAIL_PASS) {
-      const host = req.headers["x-forwarded-host"] || req.get("host") || "localhost:3000";
-      const proto = req.headers["x-forwarded-proto"] || "http";
-      responsePayload.devVerifyLink = process.env.APP_URL 
-        ? `${process.env.APP_URL}?verify=true&token=${vToken}&email=${encodeURIComponent(normalizedEmail)}`
-        : `${proto}://${host}?verify=true&token=${vToken}&email=${encodeURIComponent(normalizedEmail)}`;
+      const baseUrl = getPublicAppUrl(req);
+      responsePayload.devVerifyLink = `${baseUrl}?verify=true&token=${vToken}&email=${encodeURIComponent(normalizedEmail)}`;
   }
   
   res.json(responsePayload);
