@@ -11,10 +11,7 @@ export function getApiUrl(path: string): string {
     window.location.hostname.includes("github.io") || 
     window.location.hostname.includes("vercel.app") ||
     window.location.hostname.includes("netlify.app") ||
-    window.location.hostname.includes("amplifyapp.com") ||
-    (!window.location.hostname.includes("run.app") && 
-     !window.location.hostname.includes("localhost") && 
-     !window.location.hostname.includes("127.0.0.1"));
+    window.location.hostname.includes("amplifyapp.com");
 
   if (isStaticHosting) {
     // Automatically fall back to the live public Cloud Run backend URL
