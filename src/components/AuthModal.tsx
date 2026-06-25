@@ -47,12 +47,12 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, closable = true }: 
       
       if (data.devVerifyLink) {
         setDevVerifyLink(data.devVerifyLink);
-        setSuccessMsg("Check configuration. Dev Verification URL is printed to DevTools Console.");
+        setSuccessMsg("Verification mail sent.");
         console.log("-----------------------------------------");
         console.log("DEV VERIFICATION LINK (Copy & Paste):", data.devVerifyLink);
         console.log("-----------------------------------------");
       } else {
-        setSuccessMsg(data.message || "Verification email sent.");
+        setSuccessMsg(data.message || "Verification mail sent.");
       }
     } catch (err: any) {
       setError(err.message || "An error occurred.");
@@ -100,7 +100,7 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, closable = true }: 
         if (!response.ok) {
           throw new Error(data.error || "Failed to send reset email.");
         }
-        setSuccessMsg(data.message || "Reset link sent successfully.");
+        setSuccessMsg(data.message || "Reset password mail sent.");
       } catch (err: any) {
         const isStaticHosting = window.location.hostname.includes("github.io");
         if (isStaticHosting && (err.message.includes("network") || err.message.includes("pattern") || err.message.includes("JSON") || err.message.includes("Unexpected token"))) {
@@ -161,12 +161,12 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, closable = true }: 
       if (data.requireVerification) {
         if (data.devVerifyLink) {
            setDevVerifyLink(data.devVerifyLink);
-           setSuccessMsg("Check configuration. Dev Verification URL is printed to DevTools Console.");
+           setSuccessMsg("Verification mail sent.");
            console.log("-----------------------------------------");
            console.log("DEV VERIFICATION LINK (Copy & Paste):", data.devVerifyLink);
            console.log("-----------------------------------------");
         } else {
-           setSuccessMsg(data.message || "Please check your email to verify your account.");
+           setSuccessMsg(data.message || "Verification mail sent.");
         }
         setNeedsVerification(true);
         setTab("login");
