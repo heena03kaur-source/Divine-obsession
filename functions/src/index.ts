@@ -239,13 +239,19 @@ const isDev = process.env.NODE_ENV === "development";
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: isDev ? 10000 : 10,
-  message: { error: "Too many requests from this IP, please try again after 15 minutes." }
+  message: { error: "Too many requests from this IP, please try again after 15 minutes." },
+  handler: (req, res, next, options) => {
+    res.status(options.statusCode).json(options.message);
+  }
 });
 
 const emailLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: isDev ? 10000 : 5,
-  message: { error: "Too many email requests from this IP, please try again after an hour." }
+  message: { error: "Too many email requests from this IP, please try again after an hour." },
+  handler: (req, res, next, options) => {
+    res.status(options.statusCode).json(options.message);
+  }
 });
 
 const requireAdmin = (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -1181,6 +1187,21 @@ app.post("/api/resend-verification", emailLimiter, async (req, res) => {
   }
   
   res.json(responsePayload);
+});
+
+// Global Error Handler to guarantee JSON responses and log errors
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error("Unhandled Server Error:", err);
+  
+  try {
+    fs.appendFileSync("mail.log", `[SERVER ERROR at ${new Date().toISOString()}]\n` + (err.stack || err.message) + "\n\n");
+  } catch (e) {
+    // Ignore log writing failure
+  }
+
+  res.status(err.status || 500).json({
+    error: err.message || "Internal Server Error"
+  });
 });
 
 export const api = onRequest(app);
