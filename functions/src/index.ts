@@ -649,10 +649,8 @@ function getMailTransporter() {
     mailTransporter.verify((err: any, success: any) => {
       if (err) {
         console.error("[SMTP INIT] Connection/Credentials verification FAILED:", err.message);
-        fs.writeFileSync("mail.log", `[SMTP INIT ERROR at ${new Date().toISOString()}] Connection failed: ${err.message}\n`, { flag: 'a' });
       } else {
         console.log("[SMTP INIT] Connection verified successfully! SMTP is ready.");
-        fs.writeFileSync("mail.log", `[SMTP INIT SUCCESS at ${new Date().toISOString()}] Connection verified successfully!\n`, { flag: 'a' });
       }
     });
   }
@@ -690,7 +688,6 @@ function logDiagnostics(req: express.Request, context: string) {
     }
   };
   console.log(`[DIAGNOSTICS - ${context}]`, JSON.stringify(diagnostics, null, 2));
-  fs.writeFileSync("mail.log", `[DIAGNOSTICS - ${context} at ${new Date().toISOString()}]\n` + JSON.stringify(diagnostics, null, 2) + "\n\n", { flag: 'a' });
   return diagnostics;
 }
 
@@ -790,7 +787,6 @@ async function sendVerificationEmail(req: express.Request, normalizedEmail: stri
 </html>`
   });
   console.log("Message ID:", info.messageId);
-  fs.writeFileSync("mail.log", "Token generated: " + token + "\nMail sent successfully to " + normalizedEmail + " with messageId " + info.messageId + " at " + new Date().toISOString() + "\n", { flag: 'a' });
 }
 
 app.get("/api/env-debug", (req, res) => {
@@ -865,7 +861,6 @@ app.get("/api/test-email", async (req, res) => {
     };
     
     console.log("SMTP response details for DELIVERY TEST:", JSON.stringify(smtpLog, null, 2));
-    fs.writeFileSync("mail.log", "DELIVERY TEST DETAILS:\n" + JSON.stringify(smtpLog, null, 2) + "\n\n", { flag: 'a' });
     
     res.json({ 
       success: true, 
@@ -882,7 +877,6 @@ app.get("/api/test-email", async (req, res) => {
     });
   } catch (error: any) {
     console.error("Delivery test email failed:", error);
-    fs.writeFileSync("mail.log", "DELIVERY TEST EMAIL ERROR at " + new Date().toISOString() + ": " + error.message + "\n" + error.stack + "\n\n", { flag: 'a' });
     res.status(500).json({ 
       success: false, 
       error: error.message, 
@@ -898,11 +892,9 @@ app.post("/api/forgot-password", emailLimiter, async (req, res) => {
   
   const timestamp = new Date().toISOString();
   console.log(`[FORGOT PASSWORD STEP 1 - ROUTE RECEIVED] at ${timestamp}. Email: "${email}"`);
-  fs.writeFileSync("mail.log", `[FORGOT PASSWORD STEP 1 - ROUTE RECEIVED at ${timestamp}] Email: "${email}"\n`, { flag: 'a' });
 
   if (!email) {
     console.warn("[FORGOT PASSWORD FAILURE] Missing email in request body.");
-    fs.writeFileSync("mail.log", `[FORGOT PASSWORD FAILURE] Missing email in request body.\n\n`, { flag: 'a' });
     res.status(400).json({ error: "Email address is required.", diagnostics });
     return;
   }
@@ -912,11 +904,9 @@ app.post("/api/forgot-password", emailLimiter, async (req, res) => {
   const userObj = db.users.find((u) => u.email.toLowerCase() === normalizedEmail);
 
   console.log(`[FORGOT PASSWORD STEP 2 - USER LOOKUP] Email: "${normalizedEmail}". Found user object: ${!!userObj}`);
-  fs.writeFileSync("mail.log", `[FORGOT PASSWORD STEP 2 - USER LOOKUP] Email: "${normalizedEmail}". Found user object: ${!!userObj}\n`, { flag: 'a' });
 
   if (!userObj) {
     console.log(`[FORGOT PASSWORD FLOW END - USER NOT FOUND] Returning 200/success anyway to prevent user enumeration.`);
-    fs.writeFileSync("mail.log", `[FORGOT PASSWORD FLOW END - USER NOT FOUND] Returning 200/success anyway\n\n`, { flag: 'a' });
     res.json({ 
       success: true, 
       message: "If that email exists, a reset link will be sent.",
@@ -934,12 +924,10 @@ app.post("/api/forgot-password", emailLimiter, async (req, res) => {
   const resetLink = `${baseUrl}?reset=true&token=${token}&email=${encodeURIComponent(normalizedEmail)}`;
 
   console.log(`[FORGOT PASSWORD STEP 3 - TOKEN GENERATED] Token: "${token}". Reset Link: "${resetLink}"`);
-  fs.writeFileSync("mail.log", `[FORGOT PASSWORD STEP 3 - TOKEN GENERATED] Token: "${token}". Reset Link: "${resetLink}"\n`, { flag: 'a' });
 
   try {
     if (!process.env.MAIL_USER || !process.env.MAIL_PASS) {
         console.warn("[FORGOT PASSWORD FAILURE - SECRETS MISSING] MAIL_USER and MAIL_PASS are not set. The reset link is: " + resetLink);
-        fs.writeFileSync("mail.log", `[FORGOT PASSWORD FAILURE - SECRETS MISSING] MAIL_USER or MAIL_PASS not defined. Reset link: ${resetLink}\n\n`, { flag: 'a' });
         res.json({ 
           success: true, 
           message: "Secrets missing. If you are the developer, check server logs for the link. Otherwise, please configure MAIL_USER and MAIL_PASS.",
@@ -948,7 +936,6 @@ app.post("/api/forgot-password", emailLimiter, async (req, res) => {
     } else {
         console.log(`[FORGOT PASSWORD STEP 4 - SENDMAIL START] Invoking sendMail via nodemailer transporter.`);
         console.log(`[FORGOT PASSWORD STEP 4] Sender: "${process.env.MAIL_USER}". Recipient: "${normalizedEmail}"`);
-        fs.writeFileSync("mail.log", `[FORGOT PASSWORD STEP 4 - SENDMAIL START] Sender: "${process.env.MAIL_USER}". Recipient: "${normalizedEmail}"\n`, { flag: 'a' });
         
         const info = await getMailTransporter().sendMail({
           from: `"Divine Obsession" <${process.env.MAIL_USER}>`,
@@ -1047,7 +1034,6 @@ app.post("/api/forgot-password", emailLimiter, async (req, res) => {
         };
         
         console.log("[FORGOT PASSWORD STEP 5 - SENDMAIL RESPONSE]:", JSON.stringify(smtpLog, null, 2));
-        fs.writeFileSync("mail.log", "FORGOT PASSWORD DETAILS (STEP 5):\n" + JSON.stringify(smtpLog, null, 2) + "\n\n", { flag: 'a' });
         
         res.json({ 
           success: true, 
@@ -1061,7 +1047,6 @@ app.post("/api/forgot-password", emailLimiter, async (req, res) => {
     }
   } catch (err: any) {
     console.error("[FORGOT PASSWORD FAILURE - EXCEPTION]:", err);
-    fs.writeFileSync("mail.log", "[FORGOT PASSWORD FAILURE - EXCEPTION] Mail error: " + err.message + "\n" + err.stack + "\n\n", { flag: 'a' });
     res.status(500).json({ 
       error: "Failed to send reset email due to server error. " + (err.message || ""),
       stack: err.stack,
@@ -1203,7 +1188,6 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   console.error("Unhandled Server Error:", err);
   
   try {
-    fs.appendFileSync("mail.log", `[SERVER ERROR at ${new Date().toISOString()}]\n` + (err.stack || err.message) + "\n\n");
   } catch (e) {
     // Ignore log writing failure
   }
