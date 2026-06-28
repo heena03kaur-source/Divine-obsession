@@ -450,7 +450,7 @@ app.post("/api/login", authLimiter, (req, res) => {
 });
 
 // 9. POST /api/register
-app.post("/api/register", authLimiter, (req, res) => {
+app.post("/api/register", authLimiter, async (req, res) => {
   const { email, password, name } = req.body;
   if (!email || !password || !name) {
     res.status(400).json({ error: "All account fields are strictly mandatory." });
@@ -486,20 +486,21 @@ app.post("/api/register", authLimiter, (req, res) => {
   
   saveDB();
   
-  // Asynchronously send the email to not block the request
-  sendVerificationEmail(req, normalizedEmail, vToken).catch((err) => {
+  try {
+    await sendVerificationEmail(req, normalizedEmail, vToken);
+  } catch (err: any) {
     console.error("Critical: Failed to send signup verification email.", err);
-  });
+    res.status(500).json({ error: "Failed to send verification email. " + err.message });
+    return;
+  }
 
   const responsePayload: any = {
     requireVerification: true,
     message: "We've sent a verification email. Please verify your email before signing in."
   };
 
-  if (!process.env.MAIL_USER || !process.env.MAIL_PASS) {
-      const baseUrl = getPublicAppUrl(req);
-      responsePayload.devVerifyLink = `${baseUrl}?verify=true&token=${vToken}&email=${encodeURIComponent(normalizedEmail)}`;
-  }
+  const baseUrl = getPublicAppUrl(req);
+  responsePayload.devVerifyLink = `${baseUrl}?verify=true&token=${vToken}&email=${encodeURIComponent(normalizedEmail)}`;
 
   res.status(201).json(responsePayload);
 });
@@ -931,7 +932,8 @@ app.post("/api/forgot-password", emailLimiter, async (req, res) => {
         console.warn("[FORGOT PASSWORD FAILURE - SECRETS MISSING] MAIL_USER and MAIL_PASS are not set. The reset link is: " + resetLink);
         res.json({ 
           success: true, 
-          message: "Secrets missing. If you are the developer, check server logs for the link. Otherwise, please configure MAIL_USER and MAIL_PASS.",
+          message: "Secrets missing. Please configure MAIL_USER and MAIL_PASS.",
+          devVerifyLink: resetLink,
           diagnostics: { ...diagnostics, secretsMissing: true }
         });
     } else {
@@ -1039,6 +1041,7 @@ app.post("/api/forgot-password", emailLimiter, async (req, res) => {
         res.json({ 
           success: true, 
           message: "If that email exists, a reset link will be sent.",
+          devVerifyLink: resetLink,
           messageId: info.messageId,
           response: info.response,
           accepted: info.accepted,
@@ -1170,16 +1173,18 @@ app.post("/api/resend-verification", emailLimiter, async (req, res) => {
   verificationTokens[normalizedEmail] = { token: vToken, expiry, resendAttempts: attempts, lastSent: Date.now() };
   saveDB();
   
-  sendVerificationEmail(req, normalizedEmail, vToken).catch((err) => {
+  try {
+    await sendVerificationEmail(req, normalizedEmail, vToken);
+  } catch (err: any) {
     console.error("Critical: Failed to resend verification email.", err);
-  });
+    res.status(500).json({ error: "Failed to send verification email. " + err.message });
+    return;
+  }
   
   const responsePayload: any = { success: true, message: "Verification email sent." };
   
-  if (!process.env.MAIL_USER || !process.env.MAIL_PASS) {
-      const baseUrl = getPublicAppUrl(req);
-      responsePayload.devVerifyLink = `${baseUrl}?verify=true&token=${vToken}&email=${encodeURIComponent(normalizedEmail)}`;
-  }
+  const baseUrl = getPublicAppUrl(req);
+  responsePayload.devVerifyLink = `${baseUrl}?verify=true&token=${vToken}&email=${encodeURIComponent(normalizedEmail)}`;
   
   res.json(responsePayload);
 });
