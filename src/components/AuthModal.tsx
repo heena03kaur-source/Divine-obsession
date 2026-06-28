@@ -22,10 +22,16 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, closable = true }: 
   const [devVerifyLink, setDevVerifyLink] = useState<string | null>(null);
 
   useEffect(() => {
+    if (isOpen) {
+      setError(null);
+      setSuccessMsg(null);
+      setNeedsVerification(false);
+      setDevVerifyLink(null);
+    }
+  }, [isOpen]);
+  
+  useEffect(() => {
     setError(null);
-    setSuccessMsg(null);
-    setNeedsVerification(false);
-    setDevVerifyLink(null);
   }, [tab, isForgotPassword]);
 
   if (!isOpen) return null;
@@ -99,6 +105,9 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, closable = true }: 
 
         if (!response.ok) {
           throw new Error(data.error || "Failed to send reset email.");
+        }
+        if (data.devVerifyLink) {
+          setDevVerifyLink(data.devVerifyLink);
         }
         setSuccessMsg(data.message || "Reset password mail sent.");
       } catch (err: any) {
