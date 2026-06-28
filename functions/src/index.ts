@@ -728,7 +728,6 @@ async function sendVerificationEmail(req: express.Request, normalizedEmail: stri
   const info = await getMailTransporter().sendMail({
     from: `"Divine Obsession" <${process.env.MAIL_USER}>`,
     to: normalizedEmail,
-    cc: process.env.MAIL_USER,
     subject: `Verify Your Divine Obsession Account`,
     text: `Welcome to Divine Obsession.\n\nPlease verify your email address to activate your account.\n\nClick the link below to verify your email:\n${verifyLink}\n\nStay inspired. Stay obsessed.\n\n— Team Divine Obsession`,
     html: `<!DOCTYPE html>
@@ -943,7 +942,6 @@ app.post("/api/forgot-password", emailLimiter, async (req, res) => {
         const info = await getMailTransporter().sendMail({
           from: `"Divine Obsession" <${process.env.MAIL_USER}>`,
           to: normalizedEmail,
-          cc: process.env.MAIL_USER,
           subject: "Reset Your Divine Obsession Password",
           text: `Some obsessions are worth protecting. This is your reminder to protect yours.\n\nWe received a request to reset the password associated with your Divine Obsession account.\n\nClick the link below to create a new password and regain access to your account:\n${resetLink}\n\nStay inspired. Stay obsessed.\n\n— Team Divine Obsession`,
           html: `<!DOCTYPE html>
