@@ -146,6 +146,7 @@ let db: LocalDB = {
       googleAuth: false,
       createdAt: new Date().toISOString(),
       isAdmin: true,
+      verified: false,
     },
   ],
   sessions: [],
