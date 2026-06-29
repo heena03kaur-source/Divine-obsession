@@ -46,7 +46,17 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, closable = true }: 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim().toLowerCase() }),
       });
-      const data = await res.json();
+      
+      const text = await res.text();
+      let data;
+      try {
+        if (!text) throw new Error("Empty response");
+        data = JSON.parse(text);
+      } catch (e) {
+        if (!res.ok) throw new Error(text ? `Server error: ${text.substring(0, 100)}` : "Server returned an empty error response.");
+        throw new Error("Server response was not valid JSON.");
+      }
+      
       if (!res.ok) {
         throw new Error(data.error || "Failed to resend verification email.");
       }
@@ -94,12 +104,15 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, closable = true }: 
         
         let data;
         try {
+          if (!text) {
+            throw new Error("Empty response from server.");
+          }
           data = JSON.parse(text);
-        } catch (e) {
+        } catch (e: any) {
           if (!response.ok) {
-            throw new Error(text || "Server returned an error.");
+            throw new Error(text ? `Server error: ${text.substring(0, 100)}` : "Server returned an empty error response.");
           } else {
-            throw new Error("Server response was not valid JSON.");
+            throw new Error("Server response was not valid JSON: " + e.message);
           }
         }
 
@@ -148,12 +161,15 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, closable = true }: 
 
       let data;
       try {
+        if (!text) {
+          throw new Error("Empty response from server.");
+        }
         data = JSON.parse(text);
-      } catch (e) {
+      } catch (e: any) {
         if (!response.ok) {
-          throw new Error(text || "Server returned an error.");
+          throw new Error(text ? `Server error: ${text.substring(0, 100)}` : "Server returned an empty error response.");
         } else {
-          throw new Error("Server response was not valid JSON.");
+          throw new Error("Server response was not valid JSON: " + e.message);
         }
       }
 

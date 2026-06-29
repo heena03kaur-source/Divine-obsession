@@ -34,7 +34,15 @@ export function ResetPasswordModal({ email, token, onClose }: ResetProps) {
         throw new Error("Cannot reset password from GitHub Pages. A backend server is required.");
       }
       
-      const data = JSON.parse(text);
+      let data;
+      try {
+        if (!text) throw new Error("Empty response from server.");
+        data = JSON.parse(text);
+      } catch (e: any) {
+        if (!resp.ok) throw new Error(text ? `Server error: ${text.substring(0, 100)}` : "Server returned an empty error response.");
+        throw new Error("Server response was not valid JSON: " + e.message);
+      }
+      
       if (!resp.ok) {
         throw new Error(data.error || "Failed to reset password.");
       }
