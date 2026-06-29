@@ -41,7 +41,7 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, closable = true }: 
       setLoading(true);
       setError(null);
       setDevVerifyLink(null);
-      const res = await fetch(getApiUrl("/api/resend-verification"), {
+      const res = await fetch(getApiUrl("/api/request-verification"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim().toLowerCase() }),
@@ -76,7 +76,7 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, closable = true }: 
 
     if (isForgotPassword) {
       try {
-        const response = await fetch(getApiUrl("/api/forgot-password"), {
+        const response = await fetch(getApiUrl("/api/recover-password"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: email.trim().toLowerCase() }),

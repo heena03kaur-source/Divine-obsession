@@ -887,7 +887,7 @@ app.get("/api/test-email", async (req, res) => {
   }
 });
 
-app.post("/api/forgot-password", emailLimiter, async (req, res) => {
+app.post("/api/recover-password", emailLimiter, async (req, res) => {
   const diagnostics = logDiagnostics(req, "forgot-password");
   const { email } = req.body;
   
@@ -1128,7 +1128,7 @@ app.post("/api/verify-email", (req, res) => {
   res.json({ success: true, message: "Email verified successfully.", token: authToken, email: userObj.email, isAdmin: !!userObj.isAdmin });
 });
 
-app.post("/api/resend-verification", emailLimiter, async (req, res) => {
+app.post("/api/request-verification", emailLimiter, async (req, res) => {
   const { email } = req.body;
   if (!email) {
     res.status(400).json({ error: "Email address is required." });
