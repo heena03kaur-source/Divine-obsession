@@ -20,5 +20,8 @@ export function getApiUrl(path: string): string {
     // Automatically fall back to the live public Cloud Run backend URL
     return `https://ais-pre-rqsgkn6k3jdlkdlh7e4s5h-139041493732.asia-southeast1.run.app${path}`;
   }
-  return path;
+  
+  // Use absolute URL to prevent "Load failed" in certain Safari/iframe scenarios
+  const origin = typeof window !== "undefined" && window.location.origin ? window.location.origin : "";
+  return `${origin}${path}`;
 }
