@@ -63,12 +63,12 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, closable = true }: 
       let data;
       try {
         if (!text) {
-          throw new Error("Empty response from server.");
+          throw new Error(`Server responded with status ${response.status} but no content.`);
         }
         data = JSON.parse(text);
       } catch (e: any) {
         if (!response.ok) {
-          throw new Error(text ? `Server error: ${text.substring(0, 100)}` : "Server returned an empty error response.");
+          throw new Error(text ? `Server error: ${text.substring(0, 100)}` : `Server error: ${response.statusText} (${response.status})`);
         } else {
           throw new Error("Server response was not valid JSON: " + e.message);
         }
