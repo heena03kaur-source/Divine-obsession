@@ -10,7 +10,6 @@ import { CredentialsPanel } from "./components/CredentialsPanel";
 import { AdminDashboard } from "./components/AdminDashboard";
 import { NotFound } from "./components/NotFound";
 import { AuthModal } from "./components/AuthModal";
-import { ResetPasswordModal } from "./components/ResetPasswordModal";
 import { ReadLaterList } from "./components/ReadLaterList";
 import { Post } from "./types";
 import { Award, BookOpen, Heart } from "lucide-react";
@@ -36,55 +35,10 @@ export default function App() {
   );
   
   const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
-  const [resetTokenInfo, setResetTokenInfo] = useState<{ token: string, email: string } | null>(null);
   const [verificationFeedback, setVerificationFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
   useEffect(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get("reset") === "true" && params.get("token") && params.get("email")) {
-        setResetTokenInfo({
-          token: params.get("token")!,
-          email: params.get("email")!
-        });
-        // Clean up URL
-        window.history.replaceState({}, document.title || "", window.location.pathname);
-      }
-      
-      if (params.get("verify") === "true" && params.get("token") && params.get("email")) {
-        const vToken = params.get("token")!;
-        const vEmail = params.get("email")!;
-        window.history.replaceState({}, document.title || "", window.location.pathname);
-        
-        fetch(getApiUrl("/api/verify-email"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: vEmail, token: vToken })
-        }).then(res => res.json()).then(data => {
-          if (data.success) {
-            setVerificationFeedback({ type: 'success', message: "Your email has been verified. You can now access your account." });
-            if (data.token) {
-              setToken(data.token);
-              setUserEmail(data.email);
-              setIsAdmin(!!data.isAdmin);
-              try {
-                safeLocalStorage.setItem("sage_blog_token", data.token);
-                safeLocalStorage.setItem("sage_blog_email", data.email);
-                safeLocalStorage.setItem("sage_blog_is_admin", String(!!data.isAdmin));
-              } catch (e) {
-                // Ignore LS error
-              }
-            }
-          } else {
-            setVerificationFeedback({ type: 'error', message: data.error || "Failed to verify email." });
-          }
-        }).catch(err => {
-          setVerificationFeedback({ type: 'error', message: "Failed to communicate with the server." });
-        });
-      }
-    } catch (e) {
-      console.warn("Error modifying history:", e);
-    }
+    // URL parsing logic for reset/verify removed
   }, []);
 
   const [posts, setPosts] = useState<Post[]>([]);
@@ -544,14 +498,6 @@ export default function App() {
         onLoginSuccess={handleLoginSuccess}
         closable={true}
       />
-
-      {resetTokenInfo && (
-        <ResetPasswordModal
-          email={resetTokenInfo.email}
-          token={resetTokenInfo.token}
-          onClose={() => setResetTokenInfo(null)}
-        />
-      )}
 
       {/* Structured elegant decoration footer */}
       <footer className="mt-auto border-t border-[#7DB095]/10 bg-white py-6" id="footer-decor">
