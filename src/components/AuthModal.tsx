@@ -44,11 +44,24 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, closable = true }: 
       : { email: email.trim().toLowerCase(), password: password.trim(), name: name.trim() || email.split("@")[0] };
 
     try {
-      const response = await fetch(getApiUrl(apiPath), {
+      let response = await fetch(getApiUrl(apiPath), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(bodyPayload),
       });
+
+      // AI Studio proxy might return 302 to /__cookie_check.html if the auth cookie expired (Max-Age=60).
+      // fetch follows it as POST, resulting in 405 Method Not Allowed from the static file server.
+      // However, the 302 already refreshed the cookie, so an immediate retry will succeed.
+      if (response.status === 405) {
+        response = await fetch(getApiUrl(apiPath), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(bodyPayload),
+        });
+      }
 
       const text = await response.text();
       if (text.startsWith("<!DOCTYPE") || text.includes("<html")) {
